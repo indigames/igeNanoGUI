@@ -114,7 +114,7 @@ static void sigint_handler(int sig) {
 }
 #endif
 
-PYBIND11_MODULE(nanogui, m) {
+PYBIND11_MODULE(igeNanoGUI, m) {
     m.attr("__doc__") = "NanoGUI plugin";
 
 #if defined(NANOGUI_USE_OPENGL)
@@ -220,14 +220,19 @@ PYBIND11_MODULE(nanogui, m) {
     }, "refresh"_a = -1, "detach"_a = py::none(),
        D(mainloop), py::keep_alive<0, 2>());
 
+    m.def("mainloop_iteration", &nanogui::mainloop_iteration, D(mainloop_iteration)); // [IGE]: igeCore integration
     m.def("async", &nanogui::async, D(async));
     m.def("leave", &nanogui::leave, D(leave));
     m.def("active", &nanogui::active, D(active));
     m.def("file_dialog", (std::string(*)(const std::vector<std::pair<std::string, std::string>> &, bool)) &nanogui::file_dialog, D(file_dialog));
     m.def("file_dialog", (std::vector<std::string>(*)(const std::vector<std::pair<std::string, std::string>> &, bool, bool)) &nanogui::file_dialog, D(file_dialog, 2));
-    #if defined(__APPLE__)
-        m.def("chdir_to_bundle_parent", &nanogui::chdir_to_bundle_parent);
-    #endif
+
+    // [IGE]: linking failed on MacOS
+    // #if defined(__APPLE__)
+        // m.def("chdir_to_bundle_parent", &nanogui::chdir_to_bundle_parent);
+    // #endif
+    // [/IGE]
+
     m.def("utf8", [](int c) { return std::string(utf8(c).data()); }, D(utf8));
     m.def("load_image_directory", &nanogui::load_image_directory, D(load_image_directory));
 

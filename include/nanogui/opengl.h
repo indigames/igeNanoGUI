@@ -39,15 +39,38 @@
 #  endif
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
-#include <GLFW/glfw3.h>
+// [IGE]: igeCore integration
+#ifdef NANOGUI_BUILD_GLFW
+#  include <GLFW/glfw3.h>
+#  else
+#  include "keycode.h"
+#  if defined(NANOGUI_GLEW) && defined(WIN32)
+#    include <glew.h>
+#    include <gl/gl.h>
+#    include <gl/glu.h>
+#  endif
+#endif
 
 #if defined(NANOGUI_USE_GLES)
 #  if NANOGUI_GLES_VERSION == 2
-#    include <GLES2/gl2ext.h>
+#    if defined(__APPLE__)
+#      include <OpenGLES/ES2/gl.h>
+#      include <OpenGLES/ES2/glext.h>
+#    else
+#      include <GLES2/gl2.h>
+#      include <GLES2/gl2ext.h>
+#    endif
 #  elif NANOGUI_GLES_VERSION == 3
-#    include <GLES3/gl2ext.h>
+#    if defined(__APPLE__)
+#      include <OpenGLES/ES3/gl.h>
+#      include <OpenGLES/ES3/glext.h>
+#    else
+#      include <GLES3/gl3.h>
+#      include <GLES3/gl3ext.h>
+#    endif
 #  endif
 #endif
+// [/IGE]
 
 #include <nanovg.h>
 

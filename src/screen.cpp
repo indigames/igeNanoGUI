@@ -25,6 +25,12 @@
 #  include <emscripten/html5.h>
 #endif
 
+// [IGE]: igeCore integration
+#ifdef NANOGUI_BUILD_SDL2
+#  include <SDL.h>
+#endif
+// [/IGE]
+
 #if defined(_WIN32)
 #  ifndef NOMINMAX
 #    define NOMINMAX
@@ -36,9 +42,13 @@
 # endif
 #  include <windows.h>
 
-#  define GLFW_EXPOSE_NATIVE_WGL
-#  define GLFW_EXPOSE_NATIVE_WIN32
-#  include <GLFW/glfw3native.h>
+// [IGE]: GLFW switch
+#  ifdef NANOGUI_BUILD_GLFW
+#    define GLFW_EXPOSE_NATIVE_WGL
+#    define GLFW_EXPOSE_NATIVE_WIN32
+#    include <GLFW/glfw3native.h>
+#  endif
+// [/IGE]
 #endif
 
 /* Allow enforcing the GL2 implementation of NanoVG */
@@ -55,10 +65,12 @@
 #  include <nanovg_mtl.h>
 #endif
 
-#if defined(__APPLE__)
+// [IGE]: igeCore integration
+#if defined(__APPLE__) && NANOGUI_BUILD_GLFW
 #  define GLFW_EXPOSE_NATIVE_COCOA 1
 #  include <GLFW/glfw3native.h>
 #endif
+// [/IGE]
 
 #if !defined(GL_RGBA_FLOAT_MODE)
 #  define GL_RGBA_FLOAT_MODE 0x8820
@@ -74,6 +86,8 @@ static bool glad_initialized = false;
 
 /* Calculate pixel ratio for hi-dpi devices. */
 static float get_pixel_ratio(GLFWwindow *window) {
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
 #if defined(EMSCRIPTEN)
     return emscripten_get_device_pixel_ratio();
 #elif defined(_WIN32)
@@ -130,6 +144,13 @@ static float get_pixel_ratio(GLFWwindow *window) {
     glfwGetWindowSize(window, &size[0], &size[1]);
     return (float)fb_size[0] / (float)size[0];
 #endif
+#elif defined(NANOGUI_BUILD_SDL2)
+    Vector2i fb_size = {0, 0}, size = {0, 0};
+    SDL_GetWindowSize((SDL_Window*)window, &size[0], &size[1]);
+    SDL_GL_GetDrawableSize((SDL_Window*)window, &fb_size[0], &fb_size[1]);
+    return (size[0] == 0) ? 1.0f : fb_size[0] / (float)size[0];
+#endif
+// [/IGE]
 }
 
 #if defined(EMSCRIPTEN)
@@ -164,6 +185,28 @@ Screen::Screen()
       m_stencil_buffer(false), m_float_buffer(false), m_redraw(false) {
     memset(m_cursors, 0, sizeof(GLFWcursor *) * (size_t) Cursor::CursorCount);
 #if defined(NANOGUI_USE_OPENGL)
+// [IGE]: igeCore integration
+#  if defined(NANOGUI_GLAD)
+#    ifdef NANOGUI_BUILD_GLFW
+    if (!glad_initialized) {
+        glad_initialized = true;
+        if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+            throw std::runtime_error("Could not initialize GLAD!");
+        glGetError();
+    }
+#    else
+    if (!glad_initialized) {
+        glad_initialized = true;
+        if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress))
+            throw std::runtime_error("Could not initialize GLAD!");
+        glGetError();
+    }
+#    endif
+#  elif defined(NANOGUI_GLEW)
+    glewInit();
+#  endif
+// [/IGE]
+
     GLint n_stencil_bits = 0, n_depth_bits = 0;
     GLboolean float_mode;
     CHK(glGetFramebufferAttachmentParameteriv(GL_DRAW_FRAMEBUFFER,
@@ -174,6 +217,13 @@ Screen::Screen()
     m_depth_buffer = n_depth_bits > 0;
     m_stencil_buffer = n_stencil_bits > 0;
     m_float_buffer = (bool) float_mode;
+
+// [IGE]: igeCore integration
+    GLint m_viewport[4];
+    glGetIntegerv(GL_VIEWPORT, m_viewport);
+    m_fbsize = m_size = Vector2i(m_viewport[2], m_viewport[3]);
+    m_pixel_ratio = 1.0f;
+// [/IGE]
 #endif
 }
 
@@ -186,6 +236,8 @@ Screen::Screen(const Vector2i &size, const std::string &caption, bool resizable,
       m_stencil_buffer(stencil_buffer), m_float_buffer(float_buffer), m_redraw(false) {
     memset(m_cursors, 0, sizeof(GLFWcursor *) * (int) Cursor::CursorCount);
 
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
 #if defined(NANOGUI_USE_OPENGL)
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
 
@@ -206,6 +258,24 @@ Screen::Screen(const Vector2i &size, const std::string &caption, bool resizable,
 #else
 #  error Did not select a graphics API!
 #endif
+#elif defined(NANOGUI_BUILD_SDL2)
+    SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO);
+
+#  if defined(NANOGUI_USE_OPENGL)
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, gl_major);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, gl_minor);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+#  elif defined(NANOGUI_USE_GLES)
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, NANOGUI_GLES_VERSION);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+#  endif
+#endif
+// [/IGE]
 
     int color_bits = 8, depth_bits = 0, stencil_bits = 0;
 
@@ -221,6 +291,8 @@ Screen::Screen(const Vector2i &size, const std::string &caption, bool resizable,
     if (m_float_buffer)
         color_bits = 16;
 
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
     glfwWindowHint(GLFW_RED_BITS, color_bits);
     glfwWindowHint(GLFW_GREEN_BITS, color_bits);
     glfwWindowHint(GLFW_BLUE_BITS, color_bits);
@@ -269,6 +341,31 @@ Screen::Screen(const Vector2i &size, const std::string &caption, bool resizable,
         }
     }
 #endif
+#elif defined(NANOGUI_BUILD_SDL2)
+    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, color_bits);
+    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, color_bits);
+    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, color_bits);
+    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, color_bits);
+    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, stencil_bits);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, depth_bits);
+
+    int flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+    if (fullscreen) {
+        flags |= SDL_WINDOW_FULLSCREEN;
+    }
+    m_glfw_window = (GLFWwindow*) SDL_CreateWindow(caption.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, size.x(), size.y(), flags);
+    if (m_glfw_window == nullptr && m_float_buffer) {
+        printf("Could not create context with float buffer, fall-back to 32bit color buffer");
+        m_float_buffer = false;
+        color_bits = 8;
+        SDL_GL_SetAttribute(SDL_GL_RED_SIZE, color_bits);
+        SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, color_bits);
+        SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, color_bits);
+        SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, color_bits);
+        m_glfw_window = (GLFWwindow*)SDL_CreateWindow(caption.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, size.x(), size.y(), flags);
+    }
+#endif
+// [/IGE]
 
     if (!m_glfw_window) {
         (void) gl_major; (void) gl_minor;
@@ -277,13 +374,15 @@ Screen::Screen(const Vector2i &size, const std::string &caption, bool resizable,
                                  std::to_string(gl_major) + "." +
                                  std::to_string(gl_minor) + " context!");
 #elif defined(NANOGUI_USE_GLES)
-        throw std::runtime_error("Could not create a GLES 2 context!");
+        throw std::runtime_error("Could not create a GLES 3 context!"); // [IGE]: use gles3
 #elif defined(NANOGUI_USE_METAL)
         throw std::runtime_error(
             "Could not create a GLFW window for rendering using Metal!");
 #endif
     }
 
+// [IGE]: igeCore integration
+#if defined(NANOGUI_BUILD_GLFW)
 #if defined(NANOGUI_USE_OPENGL) || defined(NANOGUI_USE_GLES)
     glfwMakeContextCurrent(m_glfw_window);
 #endif
@@ -300,6 +399,24 @@ Screen::Screen(const Vector2i &size, const std::string &caption, bool resizable,
 #endif
 
     glfwGetFramebufferSize(m_glfw_window, &m_fbsize[0], &m_fbsize[1]);
+#elif defined(NANOGUI_BUILD_SDL2)
+    m_sdl_context = (void*)SDL_GL_CreateContext((SDL_Window*)m_glfw_window);
+    SDL_GL_MakeCurrent((SDL_Window*)m_glfw_window, m_sdl_context);
+
+#  if defined(NANOGUI_GLAD)
+    if (!glad_initialized) {
+        glad_initialized = true;
+
+        if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress))
+            throw std::runtime_error("Could not initialize GLAD!");
+        glGetError(); // pull and ignore unhandled errors like GL_INVALID_ENUM
+    }
+#  elif defined(NANOGUI_GLEW)
+    glewInit();
+#  endif
+    SDL_GL_GetDrawableSize((SDL_Window*)m_glfw_window, &m_fbsize[0], &m_fbsize[1]);
+#endif
+// [/IGE]
 
 #if defined(NANOGUI_USE_OPENGL) || defined(NANOGUI_USE_GLES)
     CHK(glViewport(0, 0, m_fbsize[0], m_fbsize[1]));
@@ -308,10 +425,19 @@ Screen::Screen(const Vector2i &size, const std::string &caption, bool resizable,
     CHK(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT |
                 GL_STENCIL_BUFFER_BIT));
 
+// [IGE]: igeCore integration
+#  if defined(NANOGUI_BUILD_GLFW)
     glfwSwapInterval(0);
     glfwSwapBuffers(m_glfw_window);
+#  elif defined(NANOGUI_BUILD_SDL2)
+    SDL_GL_SetSwapInterval(0);
+    SDL_GL_SwapWindow((SDL_Window*)m_glfw_window);
+#  endif
+// [/IGE]
 #endif
 
+// [IGE]: igeCore integration
+#if defined(NANOGUI_BUILD_GLFW)
 #if defined(__APPLE__)
     /* Poll for events once before starting a potentially
        lengthy loading process. This is needed to be
@@ -441,9 +567,15 @@ Screen::Screen(const Vector2i &size, const std::string &caption, bool resizable,
         );
     }
 #endif
+#else
+    initialize(m_glfw_window, true);
+#endif
+// [/IGE]
 }
 
 void Screen::initialize(GLFWwindow *window, bool shutdown_glfw) {
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
     m_glfw_window = window;
     m_shutdown_glfw = shutdown_glfw;
     glfwGetWindowSize(m_glfw_window, &m_size[0], &m_size[1]);
@@ -484,6 +616,16 @@ void Screen::initialize(GLFWwindow *window, bool shutdown_glfw) {
         glGetError(); // pull and ignore unhandled errors like GL_INVALID_ENUM
     }
 #endif
+#elif defined(NANOGUI_BUILD_SDL2)
+    if(window) {
+        m_glfw_window = window;
+        SDL_GetWindowSize((SDL_Window*)m_glfw_window, &m_size[0], &m_size[1]);
+        SDL_GL_GetDrawableSize((SDL_Window*)m_glfw_window, &m_fbsize[0], &m_fbsize[1]);
+        m_pixel_ratio = get_pixel_ratio(window);
+    }
+    m_shutdown_glfw = shutdown_glfw;
+#endif
+// [/IGE]
 
     int flags = NVG_ANTIALIAS;
     if (m_stencil_buffer)
@@ -508,7 +650,14 @@ void Screen::initialize(GLFWwindow *window, bool shutdown_glfw) {
     if (!m_nvg_context)
         throw std::runtime_error("Could not initialize NanoVG!");
 
+    // [IGE]
+#ifdef NANOGUI_BUILD_GLFW
     m_visible = glfwGetWindowAttrib(window, GLFW_VISIBLE) != 0;
+#elif defined(NANOGUI_BUILD_SDL2)
+    m_visible = (SDL_GetWindowFlags((SDL_Window*)window) & SDL_WINDOW_SHOWN);
+#endif
+// [/IGE]
+
     set_theme(new Theme(m_nvg_context));
     m_mouse_pos = Vector2i(0);
     m_mouse_state = m_modifiers = 0;
@@ -518,8 +667,19 @@ void Screen::initialize(GLFWwindow *window, bool shutdown_glfw) {
     m_redraw = true;
     __nanogui_screens[m_glfw_window] = this;
 
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
     for (size_t i = 0; i < (size_t) Cursor::CursorCount; ++i)
         m_cursors[i] = glfwCreateStandardCursor(GLFW_ARROW_CURSOR + (int) i);
+#elif defined(NANOGUI_BUILD_SDL2)
+    m_cursors[(int)Cursor::Arrow] = (GLFWcursor*)SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
+    m_cursors[(int)Cursor::IBeam] = (GLFWcursor*)SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_IBEAM);
+    m_cursors[(int)Cursor::Crosshair] = (GLFWcursor*)SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_CROSSHAIR);
+    m_cursors[(int)Cursor::Hand] = (GLFWcursor*)SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
+    m_cursors[(int)Cursor::HResize] = (GLFWcursor*)SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE);
+    m_cursors[(int)Cursor::VResize] = (GLFWcursor*)SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENS);
+#endif
+// [/IGE]
 
     /// Fixes retina display-related font rendering issue (#185)
     nvgBeginFrame(m_nvg_context, m_size[0], m_size[1], m_pixel_ratio);
@@ -528,10 +688,18 @@ void Screen::initialize(GLFWwindow *window, bool shutdown_glfw) {
 
 Screen::~Screen() {
     __nanogui_screens.erase(m_glfw_window);
+
+// [IGE]
     for (size_t i = 0; i < (size_t) Cursor::CursorCount; ++i) {
-        if (m_cursors[i])
+        if (m_cursors[i]) {
+        #ifdef NANOGUI_BUILD_GLFW
             glfwDestroyCursor(m_cursors[i]);
+        #elif defined(NANOGUI_BUILD_SDL2)
+            SDL_FreeCursor((SDL_Cursor*)m_cursors[i]);
+        #endif
+        }
     }
+// [/IGE]
 
     if (m_nvg_context) {
 #if defined(NANOGUI_USE_OPENGL)
@@ -543,24 +711,52 @@ Screen::~Screen() {
 #endif
     }
 
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
     if (m_glfw_window && m_shutdown_glfw)
         glfwDestroyWindow(m_glfw_window);
+#elif defined(NANOGUI_BUILD_SDL2)
+    if (m_glfw_window && m_shutdown_glfw) {
+        SDL_GL_DeleteContext(m_sdl_context);
+        SDL_DestroyWindow((SDL_Window*)m_glfw_window);
+    }
+#endif
+// [/IGE]
 }
 
 void Screen::set_visible(bool visible) {
     if (m_visible != visible) {
         m_visible = visible;
 
+    // [IGE]
+    #ifdef NANOGUI_BUILD_GLFW
         if (visible)
             glfwShowWindow(m_glfw_window);
         else
             glfwHideWindow(m_glfw_window);
+    #elif defined(NANOGUI_BUILD_SDL2)
+        if(m_glfw_window) {
+            if (visible)
+                SDL_ShowWindow((SDL_Window*)m_glfw_window);
+            else
+                SDL_HideWindow((SDL_Window*)m_glfw_window); 
+        }
+    #endif
+    // [/IGE]
     }
 }
 
 void Screen::set_caption(const std::string &caption) {
     if (caption != m_caption) {
+    // [IGE]
+    #ifdef NANOGUI_BUILD_GLFW
         glfwSetWindowTitle(m_glfw_window, caption.c_str());
+    #elif defined(NANOGUI_BUILD_SDL2)
+        if(m_glfw_window) {
+            SDL_SetWindowTitle((SDL_Window*)m_glfw_window, caption.c_str());
+        }
+    #endif
+    // [/IGE]
         m_caption = caption;
     }
 }
@@ -568,12 +764,24 @@ void Screen::set_caption(const std::string &caption) {
 void Screen::set_size(const Vector2i &size) {
     Widget::set_size(size);
 
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
 #if defined(_WIN32) || defined(__linux__) || defined(EMSCRIPTEN)
     glfwSetWindowSize(m_glfw_window, size.x() * m_pixel_ratio,
                                      size.y() * m_pixel_ratio);
 #else
     glfwSetWindowSize(m_glfw_window, size.x(), size.y());
 #endif
+#elif defined(NANOGUI_BUILD_SDL2)
+    if(m_glfw_window) {
+#  if defined(_WIN32) || defined(__linux__) || defined(EMSCRIPTEN)
+        SDL_SetWindowSize((SDL_Window*)m_glfw_window, size.x() * m_pixel_ratio, size.y() * m_pixel_ratio);
+#  else
+        SDL_SetWindowSize((SDL_Window*)m_glfw_window, size.x(), size.y());
+#  endif
+#endif
+    }
+// [/IGE]
 }
 
 void Screen::clear() {
@@ -586,6 +794,8 @@ void Screen::clear() {
 }
 
 void Screen::draw_setup() {
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
 #if defined(NANOGUI_USE_OPENGL) || defined(NANOGUI_USE_GLES)
     glfwMakeContextCurrent(m_glfw_window);
 #elif defined(NANOGUI_USE_METAL)
@@ -603,6 +813,14 @@ void Screen::draw_setup() {
     emscripten_get_canvas_element_size("#canvas", &m_size[0], &m_size[1]);
     m_fbsize = m_size;
 #endif
+#elif defined(NANOGUI_BUILD_SDL2)
+    if(m_glfw_window && m_sdl_context) {
+        SDL_GL_MakeCurrent((SDL_Window*)m_glfw_window, m_sdl_context);
+        SDL_GetWindowSize((SDL_Window*)m_glfw_window, &m_size[0], &m_size[1]);
+        SDL_GL_GetDrawableSize((SDL_Window*)m_glfw_window, &m_fbsize[0], &m_fbsize[1]);
+    }    
+#endif
+// [/IGE]
 
 #if defined(_WIN32) || defined(__linux__) || defined(EMSCRIPTEN)
     m_fbsize = m_size;
@@ -619,6 +837,8 @@ void Screen::draw_setup() {
 }
 
 void Screen::draw_teardown() {
+// [IGE]: igeCore integration
+#ifdef NANOGUI_BUILD_GLFW
 #if defined(NANOGUI_USE_OPENGL) || defined(NANOGUI_USE_GLES)
     glfwSwapBuffers(m_glfw_window);
 #elif defined(NANOGUI_USE_METAL)
@@ -627,6 +847,14 @@ void Screen::draw_teardown() {
     m_metal_texture = nullptr;
     m_metal_drawable = nullptr;
 #endif
+#elif defined(NANOGUI_BUILD_SDL2)
+#  if defined(NANOGUI_USE_OPENGL) || defined(NANOGUI_USE_GLES)
+    if(m_glfw_window && m_sdl_context) {
+      SDL_GL_SwapWindow((SDL_Window*)m_glfw_window);
+    }
+#  endif
+#endif
+// [/IGE]
 }
 
 void Screen::draw_all() {
@@ -747,9 +975,13 @@ bool Screen::resize_event(const Vector2i& size) {
 void Screen::redraw() {
     if (!m_redraw) {
         m_redraw = true;
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
         #if !defined(EMSCRIPTEN)
             glfwPostEmptyEvent();
         #endif
+#endif
+// [/IGE]
     }
 }
 
@@ -769,7 +1001,13 @@ void Screen::cursor_pos_callback_event(double x, double y) {
             Widget *widget = find_widget(p);
             if (widget != nullptr && widget->cursor() != m_cursor) {
                 m_cursor = widget->cursor();
+            // [IGE]
+            #ifdef NANOGUI_BUILD_GLFW
                 glfwSetCursor(m_glfw_window, m_cursors[(int) m_cursor]);
+            #elif defined(NANOGUI_BUILD_SDL2)
+                SDL_SetCursor((SDL_Cursor*)(m_cursors[(int)m_cursor]));
+            #endif
+            // [IGE]
             }
         } else {
             ret = m_drag_widget->mouse_drag_event(
@@ -792,7 +1030,13 @@ void Screen::mouse_button_callback_event(int button, int action, int modifiers) 
     m_last_interaction = glfwGetTime();
 
     #if defined(__APPLE__)
-        if (button == GLFW_MOUSE_BUTTON_1 && modifiers == GLFW_MOD_CONTROL)
+        if (button == GLFW_MOUSE_BUTTON_1 
+        #if defined(NANOGUI_BUILD_GLFW)
+            && modifiers == GLFW_MOD_CONTROL
+        #elif defined(NANOGUI_BUILD_SDL2)
+            && (modifiers & GLFW_MOD_CONTROL)
+        #endif
+            )
             button = GLFW_MOUSE_BUTTON_2;
     #endif
 
@@ -821,7 +1065,13 @@ void Screen::mouse_button_callback_event(int button, int action, int modifiers) 
 
         if (drop_widget != nullptr && drop_widget->cursor() != m_cursor) {
             m_cursor = drop_widget->cursor();
+        // [IGE]
+        #ifdef NANOGUI_BUILD_GLFW
             glfwSetCursor(m_glfw_window, m_cursors[(int) m_cursor]);
+        #elif defined(NANOGUI_BUILD_SDL2)
+            SDL_SetCursor((SDL_Cursor*)(m_cursors[(int)m_cursor]));
+        #endif
+        // [/IGE]
         }
 
         bool btn12 = button == GLFW_MOUSE_BUTTON_1 || button == GLFW_MOUSE_BUTTON_2;
@@ -887,13 +1137,23 @@ void Screen::scroll_callback_event(double x, double y) {
     }
 }
 
-void Screen::resize_callback_event(int, int) {
+void Screen::resize_callback_event(int width, int height) { // [IGE]: add width, height
 #if defined(EMSCRIPTEN)
     return;
-#endif
-    Vector2i fb_size, size;
+#endif    
+
+// [IGE]
+    Vector2i fb_size = {width, height}, size = {width, height};
+#ifdef NANOGUI_BUILD_GLFW
     glfwGetFramebufferSize(m_glfw_window, &fb_size[0], &fb_size[1]);
     glfwGetWindowSize(m_glfw_window, &size[0], &size[1]);
+#elif defined(NANOGUI_BUILD_SDL2)
+    if(m_glfw_window) {
+        SDL_GetWindowSize((SDL_Window*)m_glfw_window, &size[0], &size[1]);
+        SDL_GL_GetDrawableSize((SDL_Window*)m_glfw_window, &fb_size[0], &fb_size[1]);
+    }
+#endif
+// [/IGE]
     if (fb_size == Vector2i(0, 0) || size == Vector2i(0, 0))
         return;
     m_fbsize = fb_size; m_size = size;
@@ -1005,5 +1265,105 @@ void *Screen::metal_layer() const {
     return metal_window_layer(glfwGetCocoaWindow(m_glfw_window));
 }
 #endif
+
+// [IGE]: igeCore integration
+void Screen::on_event(void* _event)
+{
+    if(_event == nullptr)
+        return;
+
+#if defined(NANOGUI_BUILD_SDL2)
+    auto event = *(SDL_Event*)(_event);
+    switch (event.type)
+    {
+        case SDL_QUIT:
+        {
+            set_visible(false);
+        }
+        break;
+        
+        case SDL_WINDOWEVENT:
+        {
+            if(event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+                resize_callback_event(event.window.data1, event.window.data2);
+            }
+        }
+        break;
+
+        case SDL_MOUSEWHEEL:
+        {
+            scroll_callback_event(event.wheel.x, event.wheel.y);
+        }
+        break;
+
+        case SDL_MOUSEMOTION:
+        {       
+            cursor_pos_callback_event(event.motion.x, event.motion.y);
+        }
+        break;
+
+        case SDL_MOUSEBUTTONDOWN:
+        case SDL_MOUSEBUTTONUP:
+        {           
+            auto mods = SDL_GetModState();
+            auto button = GLFW_MOUSE_BUTTON_LEFT;
+            if(event.button.button == SDL_BUTTON_MIDDLE)
+                button = GLFW_MOUSE_BUTTON_MIDDLE;
+            else if (event.button.button == SDL_BUTTON_RIGHT)
+                button = GLFW_MOUSE_BUTTON_RIGHT;
+            mouse_button_callback_event(button, (event.button.type == SDL_MOUSEBUTTONDOWN ? GLFW_PRESS : GLFW_RELEASE), mods);
+        }
+        break;
+
+        case SDL_FINGERMOTION:
+        {            
+            int pos_x = (int)(event.tfinger.x * (float)m_size[0]);
+            int pos_y = (int)(event.tfinger.y * (float)m_size[1]);
+            if (pos_x < 0) pos_x = 0;
+            if (pos_x > m_size[0] - 1) pos_x = m_size[0] - 1;
+            if (pos_y < 0) pos_y = 0;
+            if (pos_y > m_size[1] - 1) pos_y = m_size[1] - 1;
+
+            cursor_pos_callback_event(pos_x, pos_y);
+        }
+        break;
+
+        case SDL_FINGERDOWN:
+        {
+            int pos_x = (int)(event.tfinger.x * (float)m_size[0]);
+            int pos_y = (int)(event.tfinger.y * (float)m_size[1]);
+            if (pos_x < 0) pos_x = 0;
+            if (pos_x > m_size[0] - 1) pos_x = m_size[0] - 1;
+            if (pos_y < 0) pos_y = 0;
+            if (pos_y > m_size[1] - 1) pos_y = m_size[1] - 1;
+
+            cursor_pos_callback_event(pos_x, pos_y);
+            mouse_button_callback_event(GLFW_MOUSE_BUTTON_LEFT, GLFW_PRESS, 0);
+        }
+        break;
+
+        case SDL_FINGERUP:
+        {
+            mouse_button_callback_event(GLFW_MOUSE_BUTTON_LEFT, GLFW_RELEASE, 0);
+        }
+        break;
+
+        case SDL_KEYDOWN:
+        case SDL_KEYUP:
+        {
+            auto mods = (int)SDL_GetModState();
+            key_callback_event(event.key.keysym.sym, event.key.keysym.scancode, event.key.state, mods);
+        }
+        break;
+
+        case SDL_TEXTINPUT:
+        {           
+            char_callback_event(event.text.text[0]);
+        }
+        break;
+    }
+#endif
+}
+// [/IGE]
 
 NAMESPACE_END(nanogui)

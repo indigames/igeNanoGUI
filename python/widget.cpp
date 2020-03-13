@@ -96,11 +96,14 @@ void register_widget(py::module &m) {
         .def("center", &Window::center, D(Window, center));
 
     py::class_<Screen, Widget, ref<Screen>, PyScreen>(m, "Screen", D(Screen))
+        .def(py::init<>(), D(Screen, Screen)) // [IGE]: igeCore integration
         .def(py::init<const Vector2i &, const std::string &, bool, bool, bool,
                       bool, bool, unsigned int, unsigned int>(),
             "size"_a, "caption"_a = "Unnamed", "resizable"_a = true, "fullscreen"_a = false,
             "depth_buffer"_a = true, "stencil_buffer"_a = true,
             "float_buffer"_a = false, "gl_major"_a = 3, "gl_minor"_a = 2, D(Screen, Screen))
+        .def("initialize", (void(Screen::*)(void*, bool)) &Screen::initialize, D(Screen, initialize))  // [IGE]: igeCore integration
+        .def("on_event", (void(Screen::*)(void*)) &Screen::on_event, D(Screen, on_event)) // [IGE]: igeCore integration
         .def("caption", &Screen::caption, D(Screen, caption))
         .def("set_caption", &Screen::set_caption, D(Screen, set_caption))
         .def("background", &Screen::background, D(Screen, background))
@@ -112,6 +115,7 @@ void register_widget(py::module &m) {
         .def("redraw", &Screen::redraw, D(Screen, redraw))
         .def("clear", &Screen::clear, D(Screen, clear))
         .def("draw_all", &Screen::draw_all, D(Screen, draw_all))
+        .def("draw_widgets", &Screen::draw_widgets, D(Screen, draw_widgets))  // [IGE]: igeCore integration
         .def("draw_contents", &Screen::draw_contents, D(Screen, draw_contents))
         .def("resize_event", &Screen::resize_event, "size"_a, D(Screen, resize_event))
         .def("resize_callback", &Screen::resize_callback)

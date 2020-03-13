@@ -101,7 +101,13 @@ void Texture::init() {
 
     (void) pixel_format_gl; (void) component_format_gl;
 
+// [IGE]: igeCore integration
+#if defined(NANOGUI_USE_OPENGL)
     GLenum tex_mode = m_samples > 1 ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
+#else
+    GLenum tex_mode = GL_TEXTURE_2D;
+#endif
+// [/IGE]
 
     if (m_flags & (uint8_t) TextureFlags::ShaderRead) {
         CHK(glGenTextures(1, &m_texture_handle));
@@ -153,12 +159,20 @@ void Texture::upload(const uint8_t *data) {
                           internal_format_gl);
 
     if (m_texture_handle != 0) {
+// [IGE]: igeCore integration
+    #if defined(NANOGUI_USE_OPENGL)
         GLenum tex_mode = m_samples > 1 ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
+    #else
+        GLenum tex_mode = GL_TEXTURE_2D;
+    #endif
+// [/IGE]
+
         CHK(glBindTexture(tex_mode, m_texture_handle));
 
         if (data)
             CHK(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
 
+// [IGE]: igeCore integration
 #if defined(NANOGUI_USE_OPENGL)
         if (data) {
             CHK(glPixelStorei(GL_UNPACK_ROW_LENGTH, 0));
@@ -176,6 +190,7 @@ void Texture::upload(const uint8_t *data) {
         CHK(glTexImage2D(tex_mode, 0, internal_format_gl, (GLsizei) m_size.x(),
                          (GLsizei) m_size.y(), 0, pixel_format_gl, component_format_gl, data));
 #endif
+// [/IGE]
 
         if (m_min_interpolation_mode == InterpolationMode::Trilinear ||
             m_mag_interpolation_mode == InterpolationMode::Trilinear)

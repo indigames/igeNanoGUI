@@ -75,16 +75,20 @@ class CMakeBuild(build_ext):
     def build_extension(self, ext):
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
         cmake_args = ['-DPYTHON_EXECUTABLE=' + sys.executable,
-                      '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
+                      '-DNANOGUI_BUILD_GLEW=YES',
                       '-DNANOGUI_BUILD_EXAMPLES=NO']
 
         cfg = 'Debug' if self.debug else 'Release'
         build_args = ['--config', cfg]
-
+        cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
+        cmake_args += ['-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), self.build_temp)]
+        cmake_args += ['-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
+        
         if platform.system() == "Windows":
-            cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
             if sys.maxsize > 2**32:
                 cmake_args += ['-A', 'x64']
+            else:
+                cmake_args += ['-A', 'Win32']
             build_args += ['--', '/m']
         else:
             cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
@@ -112,13 +116,13 @@ class InstallHeaders(install_headers):
             self.outfiles.append(out)
 
 setup(
-    name='nanogui',
+    name='igeNanoGUI',
     version='0.0.1',
     author='Wenzel Jakob',
     author_email='wenzel.jakob@epfl.ch',
     description='A minimalistic GUI library for OpenGL, GLES 2, and Metal',
     long_description='',
-    ext_modules=[CMakeExtension('nanogui')],
+    ext_modules=[CMakeExtension('igeNanoGUI')],
     headers=headers,
     cmdclass=dict(build_ext=CMakeBuild, install_headers=InstallHeaders),
     zip_safe=False

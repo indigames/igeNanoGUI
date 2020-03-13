@@ -31,6 +31,11 @@ RenderPass::RenderPass(std::vector<Object *> color_targets,
         m_depth_test = DepthTest::Always;
     }
 
+    // [IGE]: igeCore integration
+    GLint oldFBO;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &oldFBO);
+    // [/IGE]
+
     CHK(glGenFramebuffers(1, &m_framebuffer_handle));
     CHK(glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer_handle));
 
@@ -79,7 +84,7 @@ RenderPass::RenderPass(std::vector<Object *> color_targets,
 
     if (has_screen && !has_texture) {
         CHK(glDeleteFramebuffers(1, &m_framebuffer_handle));
-        m_framebuffer_handle = 0;
+        m_framebuffer_handle = oldFBO; // [IGE]: igeCore integration
     } else {
 #if defined(NANOGUI_USE_OPENGL)
         CHK(glDrawBuffers((GLsizei) draw_buffers.size(), draw_buffers.data()));
@@ -133,12 +138,14 @@ RenderPass::RenderPass(std::vector<Object *> color_targets,
         }
     }
 
-    CHK(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+    CHK(glBindFramebuffer(GL_FRAMEBUFFER, oldFBO)); // [IGE]: igeCore integration
 }
 
 RenderPass::~RenderPass() {
     CHK(glDeleteFramebuffers(1, &m_framebuffer_handle));
 }
+
+static GLint oldFBO = 0; // [IGE]: igeCore integration
 
 void RenderPass::begin() {
 #if !defined(NDEBUG)
@@ -157,6 +164,8 @@ void RenderPass::begin() {
     m_scissor_test_backup = glIsEnabled(GL_SCISSOR_TEST);
     m_cull_face_backup = glIsEnabled(GL_CULL_FACE);
     m_blend_backup = glIsEnabled(GL_BLEND);
+
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &oldFBO); // [IGE]: igeCore integration
 
     CHK(glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer_handle));
     set_viewport(m_viewport_offset, m_viewport_size);
@@ -207,7 +216,7 @@ void RenderPass::end() {
         throw std::runtime_error("RenderPass::end(): render pass is not active!");
 #endif
 
-    CHK(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+    CHK(glBindFramebuffer(GL_FRAMEBUFFER, oldFBO)); // [IGE]: igeCore integration
     if (m_blit_target)
         blit_to(Vector2i(0, 0), m_framebuffer_size, m_blit_target, Vector2i(0, 0));
 
@@ -365,6 +374,11 @@ void RenderPass::blit_to(const Vector2i &src_offset,
         what = GL_COLOR_BUFFER_BIT;
     #endif
 
+    // [IGE]: igeCore integration
+    GLint oldFBO;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &oldFBO);
+    // [/IGE]
+
     CHK(glBindFramebuffer(GL_READ_FRAMEBUFFER, m_framebuffer_handle));
     CHK(glBindFramebuffer(GL_DRAW_FRAMEBUFFER, target_id));
 
@@ -386,7 +400,7 @@ void RenderPass::blit_to(const Vector2i &src_offset,
                           (GLsizei) dst_end.x(), (GLsizei) dst_end.y(),
                           what, GL_NEAREST));
 
-    CHK(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+    CHK(glBindFramebuffer(GL_FRAMEBUFFER, oldFBO)); // [IGE]: igeCore integration
 #endif
 }
 

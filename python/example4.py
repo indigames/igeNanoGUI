@@ -9,16 +9,16 @@
 # All rights reserved. Use of this source code is governed by a
 # BSD-style license that can be found in the LICENSE.txt file.
 
-import nanogui
+import igeNanoGUI as nanogui
 import random
 import math
 import gc
 
-from nanogui import Canvas, Shader, RenderPass, Screen, Window, \
+from igeNanoGUI import Canvas, Shader, RenderPass, Screen, Window, \
     GroupLayout, Color, Widget, BoxLayout, Orientation, Alignment, \
     Button, Matrix4f
 
-from nanogui import glfw
+from igeNanoGUI import glfw
 
 class MyCanvas(Canvas):
     def __init__(self, parent):

@@ -20,6 +20,12 @@
 #include <regex>
 #include <iostream>
 
+// [IGE]: igeCore integration
+#ifdef NANOGUI_BUILD_SDL2
+#  include <SDL.h>
+#endif
+// [/IGE]
+
 NAMESPACE_BEGIN(nanogui)
 
 TextBox::TextBox(Widget *parent, const std::string &value)
@@ -403,7 +409,16 @@ bool TextBox::keyboard_event(int key, int /* scancode */, int action, int modifi
     if (m_editable && focused()) {
         if (action == GLFW_PRESS || action == GLFW_REPEAT) {
             if (key == GLFW_KEY_LEFT) {
-                if (modifiers == GLFW_MOD_SHIFT) {
+            // [IGE]: igeCore integration
+                if (
+                #if defined(NANOGUI_BUILD_GLFW)
+                    modifiers == GLFW_MOD_SHIFT
+                #else   
+                    (modifiers & GLFW_MOD_SHIFT)
+                #endif
+                    )
+            // [/IGE]
+                {
                     if (m_selection_pos == -1)
                         m_selection_pos = m_cursor_pos;
                 } else {
@@ -413,7 +428,16 @@ bool TextBox::keyboard_event(int key, int /* scancode */, int action, int modifi
                 if (m_cursor_pos > 0)
                     m_cursor_pos--;
             } else if (key == GLFW_KEY_RIGHT) {
-                if (modifiers == GLFW_MOD_SHIFT) {
+            // [IGE]: igeCore integration
+                if (
+                #if defined(NANOGUI_BUILD_GLFW)
+                    modifiers == GLFW_MOD_SHIFT
+                #else   
+                    (modifiers & GLFW_MOD_SHIFT)
+                #endif
+                    )
+            // [IGE]
+                {
                     if (m_selection_pos == -1)
                         m_selection_pos = m_cursor_pos;
                 } else {
@@ -423,7 +447,16 @@ bool TextBox::keyboard_event(int key, int /* scancode */, int action, int modifi
                 if (m_cursor_pos < (int) m_value_temp.length())
                     m_cursor_pos++;
             } else if (key == GLFW_KEY_HOME) {
-                if (modifiers == GLFW_MOD_SHIFT) {
+            // [IGE]: igeCore integration
+                if (
+                #if defined(NANOGUI_BUILD_GLFW)
+                    modifiers == GLFW_MOD_SHIFT
+                #else   
+                    (modifiers & GLFW_MOD_SHIFT)
+                #endif
+                    )
+            // [IGE]
+                {
                     if (m_selection_pos == -1)
                         m_selection_pos = m_cursor_pos;
                 } else {
@@ -432,7 +465,16 @@ bool TextBox::keyboard_event(int key, int /* scancode */, int action, int modifi
 
                 m_cursor_pos = 0;
             } else if (key == GLFW_KEY_END) {
-                if (modifiers == GLFW_MOD_SHIFT) {
+            // [IGE]: igeCore integration
+                if (
+                #if defined(NANOGUI_BUILD_GLFW)
+                    modifiers == GLFW_MOD_SHIFT
+                #else   
+                    (modifiers & GLFW_MOD_SHIFT)
+                #endif
+                    )
+            // [/IGE]
+                {
                     if (m_selection_pos == -1)
                         m_selection_pos = m_cursor_pos;
                 } else {
@@ -455,18 +497,44 @@ bool TextBox::keyboard_event(int key, int /* scancode */, int action, int modifi
             } else if (key == GLFW_KEY_ENTER) {
                 if (!m_committed)
                     focus_event(false);
-            } else if (key == GLFW_KEY_A && modifiers == SYSTEM_COMMAND_MOD) {
+        // [IGE]: igeCore integration
+            } else if (key == GLFW_KEY_A &&
+            #if defined(NANOGUI_BUILD_GLFW)
+                modifiers == SYSTEM_COMMAND_MOD
+            #else
+                (modifiers & SYSTEM_COMMAND_MOD)
+            #endif
+                ) {
                 m_cursor_pos = (int) m_value_temp.length();
                 m_selection_pos = 0;
-            } else if (key == GLFW_KEY_X && modifiers == SYSTEM_COMMAND_MOD) {
+            } else if (key == GLFW_KEY_X && 
+            #if defined(NANOGUI_BUILD_GLFW)
+                modifiers == SYSTEM_COMMAND_MOD
+            #else
+                (modifiers & SYSTEM_COMMAND_MOD)
+            #endif
+                ) {
                 copy_selection();
                 delete_selection();
-            } else if (key == GLFW_KEY_C && modifiers == SYSTEM_COMMAND_MOD) {
+            } else if (key == GLFW_KEY_C && 
+            #if defined(NANOGUI_BUILD_GLFW)
+                modifiers == SYSTEM_COMMAND_MOD
+            #else
+                (modifiers & SYSTEM_COMMAND_MOD)
+            #endif
+                ) {
                 copy_selection();
-            } else if (key == GLFW_KEY_V && modifiers == SYSTEM_COMMAND_MOD) {
+            } else if (key == GLFW_KEY_V &&
+            #if defined(NANOGUI_BUILD_GLFW)
+                modifiers == SYSTEM_COMMAND_MOD
+            #else
+                (modifiers & SYSTEM_COMMAND_MOD)
+            #endif
+                ) {
                 delete_selection();
                 paste_from_clipboard();
             }
+        // [/IGE]
 
             m_valid_format =
                 (m_value_temp == "") || check_format(m_value_temp, m_format);
@@ -523,8 +591,14 @@ bool TextBox::copy_selection() {
         if (begin > end)
             std::swap(begin, end);
 
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
         glfwSetClipboardString(sc->glfw_window(),
                                m_value_temp.substr(begin, end).c_str());
+#elif defined(NANOGUI_BUILD_SDL2)
+        SDL_SetClipboardText(m_value_temp.substr(begin, end).c_str());
+#endif
+// [/IGE]
         return true;
     }
 
@@ -535,9 +609,20 @@ void TextBox::paste_from_clipboard() {
     Screen *sc = screen();
     if (!sc)
         return;
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
     const char* cbstr = glfwGetClipboardString(sc->glfw_window());
     if (cbstr)
         m_value_temp.insert(m_cursor_pos, std::string(cbstr));
+#elif defined(NANOGUI_BUILD_SDL2)
+    if (SDL_HasClipboardText()) {
+        const char* cbstr = (const char*)SDL_GetClipboardText();
+        if (cbstr) {
+            m_value_temp.insert(m_cursor_pos, std::string(cbstr));
+        }            
+    }
+#endif
+// [/IGE]
 }
 
 bool TextBox::delete_selection() {

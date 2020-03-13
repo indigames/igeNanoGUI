@@ -34,13 +34,21 @@
 #  include <emscripten/emscripten.h>
 #endif
 
+// [IGE]: igeCore integration
+#ifdef NANOGUI_BUILD_SDL2
+#  include <SDL.h>
+#endif
+// [/IGE]
+
 NAMESPACE_BEGIN(nanogui)
 
 extern std::map<GLFWwindow *, Screen *> __nanogui_screens;
 
-#if defined(__APPLE__)
-  extern void disable_saved_application_state_osx();
-#endif
+// [IGE]: linking failed
+//#if defined(__APPLE__)
+//  extern void disable_saved_application_state_osx();
+//#endif
+// [/IGE]
 
 void init() {
     #if !defined(_WIN32)
@@ -48,10 +56,14 @@ void init() {
         setlocale(LC_NUMERIC, "C");
     #endif
 
-    #if defined(__APPLE__)
-        disable_saved_application_state_osx();
-    #endif
+// [IGE]: linking failed
+//    #if defined(__APPLE__)
+//        disable_saved_application_state_osx();
+//    #endif
+// [/IGE]
 
+// [IGE]: igeCore integration
+#ifdef NANOGUI_BUILD_GLFW
     glfwSetErrorCallback(
         [](int error, const char *descr) {
             if (error == GLFW_NOT_INITIALIZED)
@@ -68,6 +80,8 @@ void init() {
 #endif
 
     glfwSetTime(0);
+#endif
+// [/IGE]
 }
 
 static bool mainloop_active = false;
@@ -80,56 +94,90 @@ static float emscripten_refresh = 0;
 std::mutex m_async_mutex;
 std::vector<std::function<void()>> m_async_functions;
 
+// [IGE]: igeCore integration
+void mainloop_iteration() {
+// Static NanoGUI used event from main application
+#if defined(NANOGUI_BUILD_SDL2) && defined(NANOGUI_SHARED)
+    SDL_Event e;
+    while (SDL_PollEvent(&e) != 0)
+    {                
+        on_event(&e);
+    }
+#endif
+
+    int num_screens = 0;
+
+#if defined(EMSCRIPTEN)
+    double emscripten_now = glfwGetTime();
+    bool emscripten_redraw = false;
+    if (float((emscripten_now - emscripten_last) * 1000) > emscripten_refresh) {
+        emscripten_redraw = true;
+        emscripten_last = emscripten_now;
+    }
+#endif
+
+    /* Run async functions */ {
+        std::lock_guard<std::mutex> guard(m_async_mutex);
+        for (auto &f : m_async_functions)
+            f();
+        m_async_functions.clear();
+    }
+
+    for (auto kv : __nanogui_screens) {
+        Screen *screen = kv.second;
+        if (!screen->visible()) {
+            continue;
+        }
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
+        else if (glfwWindowShouldClose(screen->glfw_window())) {
+            screen->set_visible(false);
+            continue;
+        }
+#endif
+// [/IGE]
+        #if defined(EMSCRIPTEN)
+            if (emscripten_redraw || screen->tooltip_fade_in_progress())
+                screen->redraw();
+        #endif
+        screen->redraw();
+        screen->draw_all();
+        num_screens++;
+    }
+
+    if (num_screens == 0) {
+        /* Give up if there was nothing to draw */
+        mainloop_active = false;
+        return;
+    }
+    
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
+    #if !defined(EMSCRIPTEN)
+        /* Wait for mouse/keyboard or empty refresh events */
+        glfwWaitEvents();
+    #endif
+#endif
+// [/IGE]
+};
+// [/IGE]
+
+// [IGE]: igeCore integration
+void on_event(void* event)
+{
+    for (auto kv : __nanogui_screens) {
+        Screen* screen = kv.second;
+        if (!screen->visible()) {
+            continue;
+        }
+        screen->on_event(event);
+    }
+}
+// [/IGE]
+
 void mainloop(float refresh) {
     if (mainloop_active)
         throw std::runtime_error("Main loop is already running!");
-
-    auto mainloop_iteration = []() {
-        int num_screens = 0;
-
-        #if defined(EMSCRIPTEN)
-            double emscripten_now = glfwGetTime();
-            bool emscripten_redraw = false;
-            if (float((emscripten_now - emscripten_last) * 1000) > emscripten_refresh) {
-                emscripten_redraw = true;
-                emscripten_last = emscripten_now;
-            }
-        #endif
-
-        /* Run async functions */ {
-            std::lock_guard<std::mutex> guard(m_async_mutex);
-            for (auto &f : m_async_functions)
-                f();
-            m_async_functions.clear();
-        }
-
-        for (auto kv : __nanogui_screens) {
-            Screen *screen = kv.second;
-            if (!screen->visible()) {
-                continue;
-            } else if (glfwWindowShouldClose(screen->glfw_window())) {
-                screen->set_visible(false);
-                continue;
-            }
-            #if defined(EMSCRIPTEN)
-                if (emscripten_redraw || screen->tooltip_fade_in_progress())
-                    screen->redraw();
-            #endif
-            screen->draw_all();
-            num_screens++;
-        }
-
-        if (num_screens == 0) {
-            /* Give up if there was nothing to draw */
-            mainloop_active = false;
-            return;
-        }
-
-        #if !defined(EMSCRIPTEN)
-            /* Wait for mouse/keyboard or empty refresh events */
-            glfwWaitEvents();
-        #endif
-    };
 
 #if defined(EMSCRIPTEN)
     emscripten_refresh = refresh;
@@ -181,8 +229,12 @@ void mainloop(float refresh) {
         while (mainloop_active)
             mainloop_iteration();
 
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
         /* Process events once more */
         glfwPollEvents();
+#endif
+// [/IGE]
     } catch (const std::exception &e) {
         std::cerr << "Caught exception in main loop: " << e.what() << std::endl;
         leave();
@@ -205,7 +257,11 @@ bool active() {
 }
 
 void shutdown() {
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
     glfwTerminate();
+#endif
+// [/IGE]
 
 #if defined(NANOGUI_USE_METAL)
     metal_shutdown();
@@ -295,7 +351,7 @@ std::string file_dialog(const std::vector<std::pair<std::string, std::string>> &
     return result.empty() ? "" : result.front();
 }
 
-#if !defined(__APPLE__)
+//#if !defined(__APPLE__) // [IGE]: rem for linking failed
 std::vector<std::string> file_dialog(const std::vector<std::pair<std::string, std::string>> &filetypes, bool save, bool multiple) {
     static const int FILE_DIALOG_MAX_BUFFER = 16384;
     if (save && multiple) {
@@ -414,7 +470,7 @@ std::vector<std::string> file_dialog(const std::vector<std::pair<std::string, st
     return result;
 #endif
 }
-#endif
+//#endif // [IGE]: rem
 
 void Object::inc_ref() const {
     m_ref_count++;
@@ -431,6 +487,15 @@ void Object::dec_ref(bool dealloc) const noexcept {
 }
 
 Object::~Object() { }
+
+// [IGE]: Support SDL2
+#ifdef NANOGUI_BUILD_SDL2
+    #include <SDL.h>
+    extern double glfwGetTime(void) {
+        return SDL_GetTicks() / 1000.0;
+    }
+#endif
+// [/IGE]
 
 NAMESPACE_END(nanogui)
 

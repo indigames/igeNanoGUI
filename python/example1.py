@@ -9,13 +9,13 @@
 # All rights reserved. Use of this source code is governed by a
 # BSD-style license that can be found in the LICENSE.txt file.
 
-import nanogui
+import igeNanoGUI as nanogui
 import math
 import time
 import gc
 import numpy as np
 
-from nanogui import Color, ColorPicker, Screen, Window, GroupLayout, \
+from igeNanoGUI import Color, ColorPicker, Screen, Window, GroupLayout, \
                     BoxLayout, ToolButton, Label, Button, Widget, \
                     Popup, PopupButton, CheckBox, MessageDialog, \
                     VScrollPanel, ImagePanel, ImageView, ComboBox, \
@@ -23,7 +23,7 @@ from nanogui import Color, ColorPicker, Screen, Window, GroupLayout, \
                     GridLayout, Alignment, Orientation, TabWidget, \
                     IntBox, RenderPass, Shader, Texture, Matrix4f
 
-from nanogui import glfw, icons
+from igeNanoGUI import glfw, icons
 
 # A simple counter, used for dynamic tab creation with TabWidget callback
 counter = 1

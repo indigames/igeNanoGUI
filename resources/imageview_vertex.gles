@@ -1,10 +1,10 @@
-precision highp float;
+#version 300 es
 
 uniform mat4 matrix_image;
 uniform mat4 matrix_background;
-attribute vec2 position;
-varying vec2 position_background;
-varying vec2 uv;
+in vec2 position;
+out vec2 position_background;
+out vec2 uv;
 
 void main() {
     vec4 p = vec4(position, 0.0, 1.0);

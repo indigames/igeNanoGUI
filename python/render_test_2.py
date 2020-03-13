@@ -3,9 +3,9 @@
 
 import sys
 sys.path.append('python')
-import nanogui
-from nanogui import Shader, Texture, RenderPass, Screen, Matrix4f
-from nanogui import glfw
+import igeNanoGUI as nanogui
+from igeNanoGUI import Shader, Texture, RenderPass, Screen, Matrix4f
+from igeNanoGUI import glfw
 import numpy as np
 
 

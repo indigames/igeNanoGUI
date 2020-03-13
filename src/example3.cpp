@@ -53,6 +53,8 @@ Color colval(0.5f, 0.5f, 0.7f, 1.f);
 Screen *screen = nullptr;
 
 int main(int /* argc */, char ** /* argv */) {
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
     glfwInit();
     glfwSetTime(0);
 
@@ -96,11 +98,18 @@ int main(int /* argc */, char ** /* argv */) {
         throw std::runtime_error("Could not initialize GLAD!");
     glGetError(); // pull and ignore unhandled errors like GL_INVALID_ENUM
 #endif
+#else
+    // TODO: implement
+    GLFWwindow* window = nullptr;
+#endif
+// [/IGE]
 
     // Create a nanogui screen and pass the glfw pointer to initialize
     screen = new Screen();
     screen->initialize(window, true);
 
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
 #if defined(NANOGUI_USE_OPENGL) || defined(NANOGUI_USE_GLES)
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
@@ -108,6 +117,8 @@ int main(int /* argc */, char ** /* argv */) {
     glfwSwapInterval(0);
     glfwSwapBuffers(window);
 #endif
+#endif
+// [/IGE]
 
     // Create nanogui gui
     bool enabled = true;
@@ -136,6 +147,8 @@ int main(int /* argc */, char ** /* argv */) {
     screen->clear();
     screen->draw_all();
 
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
     glfwSetCursorPosCallback(window,
             [](GLFWwindow *, double x, double y) {
             screen->cursor_pos_callback_event(x, y);
@@ -177,11 +190,22 @@ int main(int /* argc */, char ** /* argv */) {
             screen->resize_callback_event(width, height);
         }
     );
+#endif
+// [/IGE]
 
     // Game loop
-    while (!glfwWindowShouldClose(window)) {
+    while (
+    #ifdef NANOGUI_BUILD_GLFW
+        !glfwWindowShouldClose(window)
+    #else
+        1
+    #endif    
+        ) {
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
         // Check if any events have been activated (key pressed, mouse moved etc.) and call corresponding response functions
         glfwPollEvents();
+#endif
 
         // Draw nanogui
         screen->draw_setup();
@@ -190,11 +214,19 @@ int main(int /* argc */, char ** /* argv */) {
         screen->draw_widgets();
         screen->draw_teardown();
 
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
         glfwSwapBuffers(window);
+#endif
+// [/IGE]
     }
 
+// [IGE]
+#ifdef NANOGUI_BUILD_GLFW
     // Terminate GLFW, clearing any resources allocated by GLFW.
     glfwTerminate();
+#endif
+// [/IGE]
 
 #if defined(NANOGUI_USE_METAL)
     metal_shutdown();

@@ -1882,6 +1882,10 @@ static const char *__doc_nanogui_Screen_has_stencil_buffer = R"doc(Does the fram
 
 static const char *__doc_nanogui_Screen_initialize = R"doc(Initialize the Screen)doc";
 
+// [IGE]: igeCore integration
+static const char *__doc_nanogui_Screen_on_event = R"doc(Handle callback event from SDL/GLFW)doc";
+// [/IGE]
+
 static const char *__doc_nanogui_Screen_key_callback_event = R"doc()doc";
 
 static const char *__doc_nanogui_Screen_keyboard_character_event = R"doc(Text input event handler: codepoint is native endian UTF-32 format)doc";
@@ -3397,6 +3401,11 @@ Remark:
     returned handle causes application to wait for the termination of
     the main loop and then swap the two thread environments back into
     their initial configuration.)doc";
+
+// [IGE]: igeCore integration
+static const char *__doc_nanogui_mainloop_iteration =
+R"doc(Function that run every loop of main program)doc";
+// [/IGE]
 
 static const char *__doc_nanogui_metal_command_queue =
 R"doc(Return a pointer to the underlying Metal command queue

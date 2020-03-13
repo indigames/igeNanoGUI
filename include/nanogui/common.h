@@ -283,15 +283,17 @@ extern NANOGUI_EXPORT std::vector<std::string>
 file_dialog(const std::vector<std::pair<std::string, std::string>> &filetypes,
             bool save, bool multiple);
 
-#if defined(__APPLE__) || defined(DOXYGEN_DOCUMENTATION_BUILD)
-/**
- * \brief Move to the application bundle's parent directory
- *
- * This is function is convenient when deploying .app bundles on OSX. It
- * adjusts the file path to the parent directory containing the bundle.
- */
-extern NANOGUI_EXPORT void chdir_to_bundle_parent();
-#endif
+// [IGE]: linking failed on MacOS
+//#if defined(__APPLE__) || defined(DOXYGEN_DOCUMENTATION_BUILD)
+///**
+// * \brief Move to the application bundle's parent directory
+// *
+// * This is function is convenient when deploying .app bundles on OSX. It
+// * adjusts the file path to the parent directory containing the bundle.
+// */
+//extern NANOGUI_EXPORT void chdir_to_bundle_parent();
+//#endif
+// [/IGE]
 
 /**
  * \brief Convert a single UTF32 character code to UTF8.
@@ -315,6 +317,18 @@ extern NANOGUI_EXPORT std::vector<std::pair<int, std::string>>
 /// Helper function used by nvg_image_icon
 extern NANOGUI_EXPORT int __nanogui_get_image(NVGcontext *ctx, const std::string &name,
                                               uint8_t *data, uint32_t size);
+
+// [IGE]: igeCore integration
+#ifndef NANOGUI_BUILD_GLFW
+extern double glfwGetTime(void);
+#endif
+
+/// Function that run every loop of main program
+extern void mainloop_iteration();
+
+/// Function to handle external events
+extern void on_event(void* event);
+// [/IGE]
 
 NAMESPACE_END(nanogui)
 

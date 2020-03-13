@@ -268,6 +268,10 @@ public:
     void move_window_to_front(Window *window);
     void draw_widgets();
 
+    // [IGE]: add
+    void on_event(void* event);
+    // [/IGE]
+
 protected:
     GLFWwindow *m_glfw_window = nullptr;
     NVGcontext *m_nvg_context = nullptr;
@@ -296,6 +300,12 @@ protected:
     void *m_metal_drawable = nullptr;
     ref<Texture> m_depth_stencil_texture;
 #endif
+
+// [IGE]: igeCore integration
+#if defined(NANOGUI_BUILD_SDL2)
+    void* m_sdl_context = nullptr;
+#endif
+// [/IGE]
 };
 
 NAMESPACE_END(nanogui)

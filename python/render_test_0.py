@@ -3,8 +3,8 @@
 
 import sys
 sys.path.append('python')
-import nanogui
-from nanogui import Shader, Texture, RenderPass, Screen
+import igeNanoGUI as nanogui
+from igeNanoGUI import Shader, Texture, RenderPass, Screen
 import numpy as np
 from PIL import Image
 

@@ -15,6 +15,12 @@
 #include <nanogui/screen.h>
 #include <nanogui/vscrollpanel.h>
 
+// [IGE]: igeCore integration
+#ifdef NANOGUI_BUILD_SDL2
+#  include <SDL.h>
+#endif
+// [/IGE]
+
 NAMESPACE_BEGIN(nanogui)
 
 TextArea::TextArea(Widget *parent) : Widget(parent),
@@ -63,7 +69,15 @@ void TextArea::clear() {
 
 bool TextArea::keyboard_event(int key, int /* scancode */, int action, int modifiers) {
     if (m_selectable && focused()) {
-        if (key == GLFW_KEY_C && modifiers == SYSTEM_COMMAND_MOD && action == GLFW_PRESS &&
+    // [IGE]: igeCore integration
+        if (key == GLFW_KEY_C
+        #if defined(NANOGUI_BUILD_GLFW)
+            && modifiers == SYSTEM_COMMAND_MOD
+        #elif defined(NANOGUI_BUILD_SDL2)
+            && (modifiers & SYSTEM_COMMAND_MOD)
+        #endif
+    // [/IGE]
+            && action == GLFW_PRESS &&
             m_selection_start != -1 && m_selection_end != -1) {
             Vector2i start = m_selection_start, end = m_selection_end;
             if (start.x() > end.x() || (start.x() == end.x() && start.y() > end.y()))
@@ -91,7 +105,13 @@ bool TextArea::keyboard_event(int key, int /* scancode */, int action, int modif
                 else
                     str += m_blocks[i].text;
             }
+        // [IGE]
+        #ifdef NANOGUI_BUILD_GLFW
             glfwSetClipboardString(screen()->glfw_window(), str.c_str());
+        #elif defined(NANOGUI_BUILD_SDL2)
+            SDL_SetClipboardText(str.c_str());
+        #endif
+        // [/IGE]
             return true;
         }
     }
