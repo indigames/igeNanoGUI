@@ -24,6 +24,10 @@ if(DEFINED ANDROID_PLATFORM)
 elseif(MSVC)
     add_compile_options(/MP)
 endif()
+
+if (NOT DEFINED IGE_ROOT)
+  set(IGE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
 #endif
 
 if (POLICY CMP0058)
@@ -33,11 +37,13 @@ if (POLICY CMP0068)
   cmake_policy(SET CMP0068 NEW) # RPATH settings on macOS don't affect install_name.
 endif()
 
-if (NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/ext/glfw/src")
-  message(FATAL_ERROR "The NanoGUI dependency repositories (GLFW, etc.) are missing! "
-    "You probably did not clone the project with --recursive. It is possible to recover "
-    "by calling \"git submodule update --init --recursive\"")
-endif()
+# [IGE]: avoid warning
+# if (NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/ext/glfw/src")
+  # message(FATAL_ERROR "The NanoGUI dependency repositories (GLFW, etc.) are missing! "
+    # "You probably did not clone the project with --recursive. It is possible to recover "
+    # "by calling \"git submodule update --init --recursive\"")
+# endif()
+# [/IGE]
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "Setting build type to 'Release' as none was specified.")
@@ -126,23 +132,22 @@ endif()
 set_property(CACHE NANOGUI_BACKEND PROPERTY STRINGS "OpenGL" "GLES 2" "GLES 3" "Metal")
 
 # Allow overriding the pybind11 library used to compile NanoGUI
-set(NANOGUI_PYBIND11_DIR "${CMAKE_CURRENT_SOURCE_DIR}/igeLibs/pybind11"
+set(NANOGUI_PYBIND11_DIR "${IGE_ROOT}/igeLibs/pybind11"
   CACHE STRING "Path containing the 'pybind11' library used to compile nanogui.")
 mark_as_advanced(NANOGUI_PYBIND11_DIR)
 
 if (NANOGUI_BUILD_PYTHON)
   # [IGE]: enable python static lib 
   if(NOT NANOGUI_BUILD_SHARED)
-    set(IGE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/igeLibs)
-    set (PYTHON_INCLUDE_DIRS "${IGE_ROOT}/Python/Include")
+    set (PYTHON_INCLUDE_DIRS "${IGE_ROOT}/igeLibs/Python/Include")
     if (MSVC)
-        list(APPEND PYTHON_INCLUDE_DIRS "${IGE_ROOT}/Python/PC")
+      list(APPEND PYTHON_INCLUDE_DIRS "${IGE_ROOT}/igeLibs/Python/PC")
     elseif (OSX)
-        list(APPEND PYTHON_INCLUDE_DIRS "${IGE_ROOT}/Python/Mac")
+      list(APPEND PYTHON_INCLUDE_DIRS "${IGE_ROOT}/igeLibs/Python/Mac")
     elseif (ANDROID)
-        list(APPEND PYTHON_INCLUDE_DIRS "${IGE_ROOT}/Python/Android")
+      list(APPEND PYTHON_INCLUDE_DIRS "${IGE_ROOT}/igeLibs/Python/Android")
     elseif (IOS)
-        list(APPEND PYTHON_INCLUDE_DIRS "${IGE_ROOT}/Python/IOS")
+      list(APPEND PYTHON_INCLUDE_DIRS "${IGE_ROOT}/igeLibs/Python/IOS")
     endif ()
   endif()
   # [/IGE]
@@ -387,23 +392,20 @@ endif()
 # [IGE]: build GLEW and SDL
 if (NANOGUI_BUILD_GLEW)
   add_definitions(-DNANOGUI_GLEW) # [IGE]: Add preprocess flag for code controlling
-  set(IGE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/igeLibs)
-  include_directories(${IGE_ROOT}/pyxCore/include/ThirdParty/GLEW)
+  include_directories(${IGE_ROOT}/igeLibs/pyxCore/include/ThirdParty/GLEW)
   set(GLEW_LIB
-    debug ${IGE_ROOT}/pyxCore/libs/pc/Debug/x64/GLEW.lib
-    optimized ${IGE_ROOT}/pyxCore/libs/pc/Release/x64/GLEW.lib
+    debug ${IGE_ROOT}/igeLibs/pyxCore/libs/pc/Debug/x64/GLEW.lib
+    optimized ${IGE_ROOT}/igeLibs/pyxCore/libs/pc/Release/x64/GLEW.lib
   )
   list(APPEND NANOGUI_EXTRA_LIBS ${GLEW_LIB})
 endif()
 
 if (NANOGUI_BUILD_SDL2)
   add_definitions(-DNANOGUI_BUILD_SDL2) # [IGE]: Add preprocess flag for code controlling
-  
-  set(IGE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/igeLibs)
-  include_directories(${IGE_ROOT}/SDL/include)
+  include_directories(${IGE_ROOT}/igeLibs/SDL/include)
   set(SDL2_LIB
-    debug ${IGE_ROOT}/SDL/libs/pc/Debug/x64/SDL2d.lib
-    optimized ${IGE_ROOT}/SDL/libs/pc/Release/x64/SDL2.lib
+    debug ${IGE_ROOT}/igeLibs/SDL/libs/pc/Debug/x64/SDL2d.lib
+    optimized ${IGE_ROOT}/igeLibs/SDL/libs/pc/Release/x64/SDL2.lib
     Crypt32 opengl32 glu32 imagehlp dinput8 dxguid user32
     gdi32 winmm imm32 ole32 oleaut32 shell32 version uuid
     Setupapi shlwapi ws2_32
@@ -411,7 +413,7 @@ if (NANOGUI_BUILD_SDL2)
   list(APPEND NANOGUI_EXTRA_LIBS ${SDL2_LIB})
 endif()
 
-include_directories(${IGE_ROOT}/stb/include)
+include_directories(${IGE_ROOT}/igeLibs/stb/include)
 # [/IGE]
 
 if (NANOGUI_BUILD_GLAD)
@@ -741,15 +743,13 @@ if (NANOGUI_BUILD_PYTHON)
 
 # [IGE]: enable python static lib 
 if(NOT NANOGUI_BUILD_SHARED)
-  add_library(nanogui-python STATIC ${NANOGUI_PYTHON_LIB_CONTENTS}) # [IGE]
-  # set_property(TARGET nanogui-python PROPERTY POSITION_INDEPENDENT_CODE ON) # [IGE]
-  set_target_properties(nanogui-python PROPERTIES OUTPUT_NAME "igeNanoGUI-static") # [IGE]
-  target_link_libraries(nanogui-python nanogui)
+  add_library(igeNanoGUI-static STATIC ${NANOGUI_PYTHON_LIB_CONTENTS}) # [IGE]
+  # set_property(TARGET igeNanoGUI-static PROPERTY POSITION_INDEPENDENT_CODE ON) # [IGE]
+  target_link_libraries(igeNanoGUI-static nanogui) # [IGE]
 else()
-  add_library(nanogui-python SHARED ${NANOGUI_PYTHON_LIB_CONTENTS}) # [IGE]
-  # set_property(TARGET nanogui-python PROPERTY POSITION_INDEPENDENT_CODE ON) # [IGE]
-  set_target_properties(nanogui-python PROPERTIES OUTPUT_NAME "igeNanoGUI") # [IGE]
-  target_link_libraries(nanogui-python nanogui)
+  add_library(igeNanoGUI SHARED ${NANOGUI_PYTHON_LIB_CONTENTS}) # [IGE]
+  # set_property(TARGET igeNanoGUI PROPERTY POSITION_INDEPENDENT_CODE ON) # [IGE]
+  target_link_libraries(igeNanoGUI nanogui) # [IGE]
 
   # Quench warnings on GCC
   if (CMAKE_COMPILER_IS_GNUCC)
