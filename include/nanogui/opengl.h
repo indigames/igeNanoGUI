@@ -69,6 +69,12 @@
 #      include <GLES3/gl3ext.h>
 #    endif
 #  endif
+// [IGE]: fix compile failed on MacOS
+# elif defined(NANOGUI_USE_OPENGL)
+#  if defined(__APPLE__)
+#    include <OpenGL/gl3.h>
+#  endif
+// [/IGE]
 #endif
 // [/IGE]
 
