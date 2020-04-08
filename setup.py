@@ -9,6 +9,17 @@ from setuptools.command.build_ext import build_ext
 from distutils.version import LooseVersion
 from distutils.command.install_headers import install_headers
 
+# Create symlink to igeLibs, if it does not exist
+if not os.path.exists('igeLibs'):
+    import subprocess
+    subprocess.call('.\scripts\symlink.bat', shell=True)
+
+is64Bit = sys.maxsize > 2 ** 32
+if is64Bit:
+    build_arch = 'x64'
+else:
+    build_arch = 'x86'
+
 headers = [
     'include/nanogui/colorpicker.h',
     'include/nanogui/arcball.h',
@@ -76,14 +87,18 @@ class CMakeBuild(build_ext):
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
         cmake_args = ['-DPYTHON_EXECUTABLE=' + sys.executable,
                       '-DNANOGUI_BUILD_GLEW=YES',
-                      '-DNANOGUI_BUILD_EXAMPLES=NO']
+                      '-DNANOGUI_BUILD_EXAMPLES=NO',
+                      '-DAPP_STYLE=SHARED',
+                      '-DPLATFORM=pc',
+                      '-DBUILD_ARCH=' + build_arch,
+                      ]
 
         cfg = 'Debug' if self.debug else 'Release'
         build_args = ['--config', cfg]
         cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
         cmake_args += ['-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), self.build_temp)]
         cmake_args += ['-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
-        
+
         if platform.system() == "Windows":
             if sys.maxsize > 2**32:
                 cmake_args += ['-A', 'x64']

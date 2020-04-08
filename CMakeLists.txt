@@ -2,6 +2,10 @@ cmake_minimum_required (VERSION 2.8.12)
 
 project(nanogui)
 
+if(NOT DEFINED APP_STYLE)
+    set (APP_STYLE STATIC)
+endif()
+
 # [IGE]: platform config
 set (CMAKE_CXX_STANDARD 17) # NanoGUI need C++17
 
@@ -71,7 +75,11 @@ else()
 endif()
 # [/IGE]
 
-set(NANOGUI_BUILD_SHARED_DEFAULT OFF) # [IGE]: prefer static
+if(${APP_STYLE} MATCHES "SHARED")
+    set(NANOGUI_BUILD_SHARED_DEFAULT ON)
+else()
+    set(NANOGUI_BUILD_SHARED_DEFAULT OFF)
+endif()
 set(NANOGUI_BUILD_PYTHON_DEFAULT ON)
 # set(NANOGUI_BUILD_GLFW_DEFAULT ON) # [IGE]: moved above
 
@@ -393,10 +401,7 @@ endif()
 if (NANOGUI_BUILD_GLEW)
   add_definitions(-DNANOGUI_GLEW) # [IGE]: Add preprocess flag for code controlling
   include_directories(${IGE_ROOT}/igeLibs/pyxCore/include/ThirdParty/GLEW)
-  set(GLEW_LIB
-    debug ${IGE_ROOT}/igeLibs/pyxCore/libs/pc/Debug/x64/GLEW.lib
-    optimized ${IGE_ROOT}/igeLibs/pyxCore/libs/pc/Release/x64/GLEW.lib
-  )
+  set(GLEW_LIB ${IGE_ROOT}/igeLibs/pyxCore/libs/${PLATFORM}/${BUILD_ARCH}/GLEW.lib)
   list(APPEND NANOGUI_EXTRA_LIBS ${GLEW_LIB})
 endif()
 
@@ -768,60 +773,60 @@ else()
 
   # Quench warnings on GCC
   if (CMAKE_COMPILER_IS_GNUCC)
-    set_property(TARGET nanogui-python APPEND PROPERTY COMPILE_OPTIONS "-Wno-unused-variable") # [IGE]
+    set_property(TARGET igeNanoGUI APPEND PROPERTY COMPILE_OPTIONS "-Wno-unused-variable") # [IGE]
   endif()
 
   if (${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_BINARY_DIR})
-    set_target_properties(nanogui-python PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/python)
+    set_target_properties(igeNanoGUI PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/python)
   endif()
 
   # The prefix and extension are provided by FindPythonLibsNew.cmake
-  set_target_properties(nanogui-python PROPERTIES PREFIX "${PYTHON_MODULE_PREFIX}")
-  set_target_properties(nanogui-python PROPERTIES SUFFIX "${PYTHON_MODULE_EXTENSION}")
+  set_target_properties(igeNanoGUI PROPERTIES PREFIX "${PYTHON_MODULE_PREFIX}")
+  set_target_properties(igeNanoGUI PROPERTIES SUFFIX "${PYTHON_MODULE_EXTENSION}")
 
   if (WIN32)
     # Set output path
-    # set_target_properties(nanogui-python PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_RELEASE "Release/python")
-    # set_target_properties(nanogui-python PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_DEBUG "Debug/python")
-    # set_target_properties(nanogui-python PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_MINSIZEREL "MinSizeRel/python")
-    # set_target_properties(nanogui-python PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO "RelWithDebInfo/python")
-    # set_target_properties(nanogui-python PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELEASE "Release/python")
-    # set_target_properties(nanogui-python PROPERTIES RUNTIME_OUTPUT_DIRECTORY_DEBUG "Debug/python")
-    # set_target_properties(nanogui-python PROPERTIES RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "MinSizeRel/python")
-    # set_target_properties(nanogui-python PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "RelWithDebInfo/python")
+    # set_target_properties(igeNanoGUI PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_RELEASE "Release/python")
+    # set_target_properties(igeNanoGUI PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_DEBUG "Debug/python")
+    # set_target_properties(igeNanoGUI PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_MINSIZEREL "MinSizeRel/python")
+    # set_target_properties(igeNanoGUI PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO "RelWithDebInfo/python")
+    # set_target_properties(igeNanoGUI PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELEASE "Release/python")
+    # set_target_properties(igeNanoGUI PROPERTIES RUNTIME_OUTPUT_DIRECTORY_DEBUG "Debug/python")
+    # set_target_properties(igeNanoGUI PROPERTIES RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "MinSizeRel/python")
+    # set_target_properties(igeNanoGUI PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "RelWithDebInfo/python")
 
     # Link against the Python shared library
-    target_link_libraries(nanogui-python ${PYTHON_LIBRARY})
+    target_link_libraries(igeNanoGUI ${PYTHON_LIBRARY})
 
     if (MSVC)
       # Optimize for size, /bigobj is needed for due to the heavy template metaprogramming in pybind11
-      set_property(TARGET nanogui-python APPEND PROPERTY COMPILE_OPTIONS # [IGE]
+      set_property(TARGET igeNanoGUI APPEND PROPERTY COMPILE_OPTIONS # [IGE]
         "/bigobj" "$<$<CONFIG:Release>:/Os>" "$<$<CONFIG:MinSizeRel>:/Os>"
         "$<$<CONFIG:RelWithDebInfo>:/Os>")
     endif()
   elseif(UNIX)
     # Optimize for size
     if (U_CMAKE_BUILD_TYPE MATCHES REL)
-      set_property(TARGET nanogui-python APPEND PROPERTY COMPILE_OPTIONS "-Os") # [IGE]
+      set_property(TARGET igeNanoGUI APPEND PROPERTY COMPILE_OPTIONS "-Os") # [IGE]
     endif()
 
     # Strip unnecessary sections of the binary on Linux/Mac OS
     if(APPLE)
-      set_target_properties(nanogui-python PROPERTIES MACOSX_RPATH ".")
-      set_target_properties(nanogui-python PROPERTIES LINK_FLAGS "-undefined dynamic_lookup ")
+      set_target_properties(igeNanoGUI PROPERTIES MACOSX_RPATH ".")
+      set_target_properties(igeNanoGUI PROPERTIES LINK_FLAGS "-undefined dynamic_lookup ")
 
       if (NOT ${U_CMAKE_BUILD_TYPE} MATCHES DEB)
-        add_custom_command(TARGET nanogui-python POST_BUILD COMMAND strip -u -r $<TARGET_FILE:nanogui-python>)
+        add_custom_command(TARGET igeNanoGUI POST_BUILD COMMAND strip -u -r $<TARGET_FILE:igeNanoGUI>)
       endif()
     else()
       if (NOT ${U_CMAKE_BUILD_TYPE} MATCHES DEB)
-        add_custom_command(TARGET nanogui-python POST_BUILD COMMAND strip $<TARGET_FILE:nanogui-python>)
+        add_custom_command(TARGET igeNanoGUI POST_BUILD COMMAND strip $<TARGET_FILE:igeNanoGUI>)
       endif()
     endif()
   endif()
 
   if (NANOGUI_INSTALL)
-    install(TARGETS nanogui-python
+    install(TARGETS igeNanoGUI
             LIBRARY DESTINATION lib
             ARCHIVE DESTINATION lib)
   endif()

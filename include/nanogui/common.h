@@ -320,14 +320,14 @@ extern NANOGUI_EXPORT int __nanogui_get_image(NVGcontext *ctx, const std::string
 
 // [IGE]: igeCore integration
 #ifndef NANOGUI_BUILD_GLFW
-extern double glfwGetTime(void);
+extern NANOGUI_EXPORT double glfwGetTime(void);
 #endif
 
 /// Function that run every loop of main program
-extern void mainloop_iteration();
+extern NANOGUI_EXPORT void mainloop_iteration();
 
 /// Function to handle external events
-extern void on_event(void* event);
+extern NANOGUI_EXPORT void on_event(void* event);
 // [/IGE]
 
 NAMESPACE_END(nanogui)

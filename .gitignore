@@ -45,3 +45,5 @@ docs/api
 # icons added :)
 resources/nanogui-entypo
 /igeLibs
+/*.pyd
+/nanogui.dll
