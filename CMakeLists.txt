@@ -403,17 +403,32 @@ endif()
 if (NANOGUI_BUILD_SDL2)
   add_definitions(-DNANOGUI_BUILD_SDL2) # [IGE]: Add preprocess flag for code controlling
   include_directories(${IGE_ROOT}/igeLibs/SDL/include)
-  set(SDL2_LIB
-    debug ${IGE_ROOT}/igeLibs/SDL/libs/pc/Debug/x64/SDL2d.lib
-    optimized ${IGE_ROOT}/igeLibs/SDL/libs/pc/Release/x64/SDL2.lib
-    Crypt32 opengl32 glu32 imagehlp dinput8 dxguid user32
-    gdi32 winmm imm32 ole32 oleaut32 shell32 version uuid
-    Setupapi shlwapi ws2_32
-  )  
+  if(MSVC)
+    set(SDL2_LIB
+        ${IGE_ROOT}/igeLibs/SDL/libs/${PLATFORM}/${BUILD_ARCH}/SDL2.lib
+        Crypt32 opengl32 glu32 imagehlp dinput8 dxguid user32
+        gdi32 winmm imm32 ole32 oleaut32 shell32 version uuid
+        Setupapi shlwapi ws2_32
+      )
+  else()
+     set(SDL2_LIB ${IGE_ROOT}/igeLibs/SDL/libs/${PLATFORM}/${BUILD_ARCH}/libSDL2.a)
+  endif()
   list(APPEND NANOGUI_EXTRA_LIBS ${SDL2_LIB})
 endif()
 
 include_directories(${IGE_ROOT}/igeLibs/stb/include)
+if(MSVC)
+  set(STB_LIBS 
+    ${IGE_ROOT}/igeLibs/stb/libs/${PLATFORM}/${BUILD_ARCH}/stb_image.lib
+    ${IGE_ROOT}/igeLibs/stb/libs/${PLATFORM}/${BUILD_ARCH}/stb_truetype.lib
+  )
+else()
+  set(STB_LIBS 
+    ${IGE_ROOT}/igeLibs/stb/libs/${PLATFORM}/${BUILD_ARCH}/libstb_image.a
+    ${IGE_ROOT}/igeLibs/stb/libs/${PLATFORM}/${BUILD_ARCH}/libstb_truetype.a
+  )
+endif()
+list(APPEND NANOGUI_EXTRA_LIBS ${STB_LIBS})
 # [/IGE]
 
 if (NANOGUI_BUILD_GLAD)
@@ -649,8 +664,8 @@ endif()
 
 if (NANOGUI_BUILD_SHARED)
   target_link_libraries(nanogui PRIVATE ${NANOGUI_EXTRA_LIBS})
-# else()
-  # target_link_libraries(nanogui PUBLIC ${NANOGUI_EXTRA_LIBS})
+else()
+  target_link_libraries(nanogui PUBLIC ${NANOGUI_EXTRA_LIBS})
 endif()
 
 if (NANOGUI_INSTALL)
