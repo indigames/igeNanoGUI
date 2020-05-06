@@ -9,11 +9,6 @@ from setuptools.command.build_ext import build_ext
 from distutils.version import LooseVersion
 from distutils.command.install_headers import install_headers
 
-# Create symlink to igeLibs, if it does not exist
-if not os.path.exists('igeLibs'):
-    import subprocess
-    subprocess.call('.\scripts\symlink.bat', shell=True)
-
 is64Bit = sys.maxsize > 2 ** 32
 if is64Bit:
     build_arch = 'x64'

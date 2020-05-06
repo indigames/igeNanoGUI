@@ -1,5 +1,7 @@
 cmake_minimum_required (VERSION 2.8.12)
 
+file(TO_CMAKE_PATH $ENV{IGE_LIBS} IGE_LIBS)
+
 project(nanogui)
 
 if(NOT DEFINED APP_STYLE)
@@ -21,16 +23,12 @@ if(DEFINED ANDROID_PLATFORM)
         add_compile_options(-march=atom -m64 -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mfpmath=sse)
     endif()
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        add_compile_options(-Ofast)
+        add_compile_options(-g0 -Ofast)
     else(CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(-Og)
     endif()
 elseif(MSVC)
     add_compile_options(/MP)
-endif()
-
-if (NOT DEFINED IGE_ROOT)
-  set(IGE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 #endif
 
@@ -140,22 +138,22 @@ endif()
 set_property(CACHE NANOGUI_BACKEND PROPERTY STRINGS "OpenGL" "GLES 2" "GLES 3" "Metal")
 
 # Allow overriding the pybind11 library used to compile NanoGUI
-set(NANOGUI_PYBIND11_DIR "${IGE_ROOT}/igeLibs/pybind11"
+set(NANOGUI_PYBIND11_DIR "${IGE_LIBS}/pybind11"
   CACHE STRING "Path containing the 'pybind11' library used to compile nanogui.")
 mark_as_advanced(NANOGUI_PYBIND11_DIR)
 
 if (NANOGUI_BUILD_PYTHON)
   # [IGE]: enable python static lib 
   if(NOT NANOGUI_BUILD_SHARED)
-    set (PYTHON_INCLUDE_DIRS "${IGE_ROOT}/igeLibs/Python/Include")
+    set (PYTHON_INCLUDE_DIRS "${IGE_LIBS}/Python/Include")
     if (MSVC)
-      list(APPEND PYTHON_INCLUDE_DIRS "${IGE_ROOT}/igeLibs/Python/PC")
+      list(APPEND PYTHON_INCLUDE_DIRS "${IGE_LIBS}/Python/PC")
     elseif (OSX)
-      list(APPEND PYTHON_INCLUDE_DIRS "${IGE_ROOT}/igeLibs/Python/Mac")
+      list(APPEND PYTHON_INCLUDE_DIRS "${IGE_LIBS}/Python/Mac")
     elseif (ANDROID)
-      list(APPEND PYTHON_INCLUDE_DIRS "${IGE_ROOT}/igeLibs/Python/Android")
+      list(APPEND PYTHON_INCLUDE_DIRS "${IGE_LIBS}/Python/Android")
     elseif (IOS)
-      list(APPEND PYTHON_INCLUDE_DIRS "${IGE_ROOT}/igeLibs/Python/IOS")
+      list(APPEND PYTHON_INCLUDE_DIRS "${IGE_LIBS}/Python/IOS")
     endif ()
   endif()
   # [/IGE]
@@ -400,37 +398,37 @@ endif()
 # [IGE]: build GLEW and SDL
 if (NANOGUI_BUILD_GLEW)
   add_definitions(-DNANOGUI_GLEW) # [IGE]: Add preprocess flag for code controlling
-  include_directories(${IGE_ROOT}/igeLibs/pyxCore/include/ThirdParty/GLEW)
-  set(GLEW_LIB ${IGE_ROOT}/igeLibs/pyxCore/libs/${PLATFORM}/${BUILD_ARCH}/GLEW.lib)
+  include_directories(${IGE_LIBS}/pyxCore/include/ThirdParty/GLEW)
+  set(GLEW_LIB ${IGE_LIBS}/pyxCore/libs/${PLATFORM}/${BUILD_ARCH}/GLEW.lib)
   list(APPEND NANOGUI_EXTRA_LIBS ${GLEW_LIB})
 endif()
 
 if (NANOGUI_BUILD_SDL2)
   add_definitions(-DNANOGUI_BUILD_SDL2) # [IGE]: Add preprocess flag for code controlling
-  include_directories(${IGE_ROOT}/igeLibs/SDL/include)
+  include_directories(${IGE_LIBS}/SDL/include)
   if(MSVC)
     set(SDL2_LIB
-        ${IGE_ROOT}/igeLibs/SDL/libs/${PLATFORM}/${BUILD_ARCH}/SDL2.lib
+        ${IGE_LIBS}/SDL/libs/${PLATFORM}/${BUILD_ARCH}/SDL2.lib
         Crypt32 opengl32 glu32 imagehlp dinput8 dxguid user32
         gdi32 winmm imm32 ole32 oleaut32 shell32 version uuid
         Setupapi shlwapi ws2_32
       )
   else()
-     set(SDL2_LIB ${IGE_ROOT}/igeLibs/SDL/libs/${PLATFORM}/${BUILD_ARCH}/libSDL2.a)
+     set(SDL2_LIB ${IGE_LIBS}/SDL/libs/${PLATFORM}/${BUILD_ARCH}/libSDL2.a)
   endif()
   list(APPEND NANOGUI_EXTRA_LIBS ${SDL2_LIB})
 endif()
 
-include_directories(${IGE_ROOT}/igeLibs/stb/include)
+include_directories(${IGE_LIBS}/stb/include)
 if(MSVC)
   set(STB_LIBS 
-    ${IGE_ROOT}/igeLibs/stb/libs/${PLATFORM}/${BUILD_ARCH}/stb_image.lib
-    ${IGE_ROOT}/igeLibs/stb/libs/${PLATFORM}/${BUILD_ARCH}/stb_truetype.lib
+    ${IGE_LIBS}/stb/libs/${PLATFORM}/${BUILD_ARCH}/stb_image.lib
+    ${IGE_LIBS}/stb/libs/${PLATFORM}/${BUILD_ARCH}/stb_truetype.lib
   )
 else()
   set(STB_LIBS 
-    ${IGE_ROOT}/igeLibs/stb/libs/${PLATFORM}/${BUILD_ARCH}/libstb_image.a
-    ${IGE_ROOT}/igeLibs/stb/libs/${PLATFORM}/${BUILD_ARCH}/libstb_truetype.a
+    ${IGE_LIBS}/stb/libs/${PLATFORM}/${BUILD_ARCH}/libstb_image.a
+    ${IGE_LIBS}/stb/libs/${PLATFORM}/${BUILD_ARCH}/libstb_truetype.a
   )
 endif()
 list(APPEND NANOGUI_EXTRA_LIBS ${STB_LIBS})
