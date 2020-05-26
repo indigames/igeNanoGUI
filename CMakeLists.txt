@@ -403,7 +403,7 @@ endif()
 if (NANOGUI_BUILD_GLEW)
   add_definitions(-DNANOGUI_GLEW) # [IGE]: Add preprocess flag for code controlling
   include_directories(${IGE_LIBS}/pyxCore/include/ThirdParty/GLEW)
-  set(GLEW_LIB ${IGE_LIBS}/pyxCore/libs/${PLATFORM}/${BUILD_ARCH}/GLEW.lib)
+  set(GLEW_LIB ${IGE_LIBS}/pyxCore/libs/${BUILD_PLATFORM}/${BUILD_ARCH}/GLEW.lib)
   list(APPEND NANOGUI_EXTRA_LIBS ${GLEW_LIB})
 endif()
 
@@ -412,13 +412,13 @@ if (NANOGUI_BUILD_SDL2)
   include_directories(${IGE_LIBS}/SDL/include)
   if(MSVC)
     set(SDL2_LIB
-        ${IGE_LIBS}/SDL/libs/${PLATFORM}/${BUILD_ARCH}/SDL2.lib
+        ${IGE_LIBS}/SDL/libs/${BUILD_PLATFORM}/${BUILD_ARCH}/SDL2.lib
         Crypt32 opengl32 glu32 imagehlp dinput8 dxguid user32
         gdi32 winmm imm32 ole32 oleaut32 shell32 version uuid
         Setupapi shlwapi ws2_32
       )
   else()
-     set(SDL2_LIB ${IGE_LIBS}/SDL/libs/${PLATFORM}/${BUILD_ARCH}/libSDL2.a)
+     set(SDL2_LIB ${IGE_LIBS}/SDL/libs/${BUILD_PLATFORM}/${BUILD_ARCH}/libSDL2.a)
   endif()
   list(APPEND NANOGUI_EXTRA_LIBS ${SDL2_LIB})
 endif()
@@ -426,13 +426,13 @@ endif()
 include_directories(${IGE_LIBS}/stb/include)
 if(MSVC)
   set(STB_LIBS 
-    ${IGE_LIBS}/stb/libs/${PLATFORM}/${BUILD_ARCH}/stb_image.lib
-    ${IGE_LIBS}/stb/libs/${PLATFORM}/${BUILD_ARCH}/stb_truetype.lib
+    ${IGE_LIBS}/stb/libs/${BUILD_PLATFORM}/${BUILD_ARCH}/stb_image.lib
+    ${IGE_LIBS}/stb/libs/${BUILD_PLATFORM}/${BUILD_ARCH}/stb_truetype.lib
   )
 else()
   set(STB_LIBS 
-    ${IGE_LIBS}/stb/libs/${PLATFORM}/${BUILD_ARCH}/libstb_image.a
-    ${IGE_LIBS}/stb/libs/${PLATFORM}/${BUILD_ARCH}/libstb_truetype.a
+    ${IGE_LIBS}/stb/libs/${BUILD_PLATFORM}/${BUILD_ARCH}/libstb_image.a
+    ${IGE_LIBS}/stb/libs/${BUILD_PLATFORM}/${BUILD_ARCH}/libstb_truetype.a
   )
 endif()
 list(APPEND NANOGUI_EXTRA_LIBS ${STB_LIBS})
