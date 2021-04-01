@@ -1,12 +1,19 @@
 cmake_minimum_required (VERSION 2.8.12)
 
-file(TO_CMAKE_PATH $ENV{IGE_LIBS} IGE_LIBS)
-
 project(nanogui)
 
 if(NOT DEFINED APP_STYLE)
     set (APP_STYLE STATIC)
 endif()
+
+# [IGE]: try include conan build config
+if(EXISTS ${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+    include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+    conan_basic_setup()
+    list(GET CONAN_INCLUDE_DIRS_PYXCORE 0 PYXCORE_INCLUDE_DIRS)
+    list(GET CONAN_INCLUDE_DIRS_PYBIND11 0 PYBIND11_INCLUDE_DIRS)
+endif()
+# [/IGE]
 
 # [IGE]: platform config
 set (CMAKE_CXX_STANDARD 17) # NanoGUI need C++17
@@ -142,23 +149,14 @@ endif()
 set_property(CACHE NANOGUI_BACKEND PROPERTY STRINGS "OpenGL" "GLES 2" "GLES 3" "Metal")
 
 # Allow overriding the pybind11 library used to compile NanoGUI
-set(NANOGUI_PYBIND11_DIR "${IGE_LIBS}/pybind11"
+set(NANOGUI_PYBIND11_DIR "${PYBIND11_INCLUDE_DIRS}"
   CACHE STRING "Path containing the 'pybind11' library used to compile nanogui.")
 mark_as_advanced(NANOGUI_PYBIND11_DIR)
 
 if (NANOGUI_BUILD_PYTHON)
   # [IGE]: enable python static lib 
   if(NOT NANOGUI_BUILD_SHARED)
-    set (PYTHON_INCLUDE_DIRS "${IGE_LIBS}/Python/Include")
-    if (MSVC)
-      list(APPEND PYTHON_INCLUDE_DIRS "${IGE_LIBS}/Python/PC")
-    elseif (OSX)
-      list(APPEND PYTHON_INCLUDE_DIRS "${IGE_LIBS}/Python/Mac")
-    elseif (ANDROID)
-      list(APPEND PYTHON_INCLUDE_DIRS "${IGE_LIBS}/Python/Android")
-    elseif (IOS)
-      list(APPEND PYTHON_INCLUDE_DIRS "${IGE_LIBS}/Python/IOS")
-    endif ()
+    set (PYTHON_INCLUDE_DIRS "${CONAN_INCLUDE_DIRS}")
   endif()
   # [/IGE]
 
@@ -402,40 +400,14 @@ endif()
 # [IGE]: build GLEW and SDL
 if (NANOGUI_BUILD_GLEW)
   add_definitions(-DNANOGUI_GLEW) # [IGE]: Add preprocess flag for code controlling
-  include_directories(${IGE_LIBS}/pyxCore/include/ThirdParty/GLEW)
-  set(GLEW_LIB ${IGE_LIBS}/pyxCore/libs/${BUILD_PLATFORM}/${BUILD_ARCH}/GLEW.lib)
-  list(APPEND NANOGUI_EXTRA_LIBS ${GLEW_LIB})
+  include_directories(${PYXCORE_INCLUDE_DIRS}/ThirdParty/GLEW)
 endif()
 
 if (NANOGUI_BUILD_SDL2)
   add_definitions(-DNANOGUI_BUILD_SDL2) # [IGE]: Add preprocess flag for code controlling
-  include_directories(${IGE_LIBS}/SDL/include)
-  if(MSVC)
-    set(SDL2_LIB
-        ${IGE_LIBS}/SDL/libs/${BUILD_PLATFORM}/${BUILD_ARCH}/SDL2.lib
-        Crypt32 opengl32 glu32 imagehlp dinput8 dxguid user32
-        gdi32 winmm imm32 ole32 oleaut32 shell32 version uuid
-        Setupapi shlwapi ws2_32
-      )
-  else()
-     set(SDL2_LIB ${IGE_LIBS}/SDL/libs/${BUILD_PLATFORM}/${BUILD_ARCH}/libSDL2.a)
-  endif()
-  list(APPEND NANOGUI_EXTRA_LIBS ${SDL2_LIB})
 endif()
 
-include_directories(${IGE_LIBS}/stb/include)
-if(MSVC)
-  set(STB_LIBS 
-    ${IGE_LIBS}/stb/libs/${BUILD_PLATFORM}/${BUILD_ARCH}/stb_image.lib
-    ${IGE_LIBS}/stb/libs/${BUILD_PLATFORM}/${BUILD_ARCH}/stb_truetype.lib
-  )
-else()
-  set(STB_LIBS 
-    ${IGE_LIBS}/stb/libs/${BUILD_PLATFORM}/${BUILD_ARCH}/libstb_image.a
-    ${IGE_LIBS}/stb/libs/${BUILD_PLATFORM}/${BUILD_ARCH}/libstb_truetype.a
-  )
-endif()
-list(APPEND NANOGUI_EXTRA_LIBS ${STB_LIBS})
+list(APPEND NANOGUI_EXTRA_LIBS ${CONAN_LIBS})
 # [/IGE]
 
 if (NANOGUI_BUILD_GLAD)

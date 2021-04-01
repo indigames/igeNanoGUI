@@ -47,3 +47,6 @@ resources/nanogui-entypo
 /igeLibs
 /*.pyd
 /nanogui.dll
+/_ige_build
+/_ige_release
+/conanfile.py
