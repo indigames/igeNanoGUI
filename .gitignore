@@ -50,3 +50,6 @@ resources/nanogui-entypo
 /_ige_build
 /_ige_release
 /conanfile.py
+/__pycache__
+/dist
+/igeNanoGUI.egg-info

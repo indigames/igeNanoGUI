@@ -6,6 +6,16 @@ if(NOT DEFINED APP_STYLE)
     set (APP_STYLE STATIC)
 endif()
 
+if (NOT DEFINED PYTHON_VERSION)
+    set(PYTHON_VERSION 3.7)
+endif()
+
+if(${APP_STYLE} MATCHES "SHARED")
+  find_package (Python ${PYTHON_VERSION} EXACT REQUIRED COMPONENTS Development)
+else()
+  set (Python_INCLUDE_DIRS "")
+endif()
+
 # [IGE]: try include conan build config
 if(EXISTS ${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
     include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
@@ -161,23 +171,20 @@ if (NANOGUI_BUILD_PYTHON)
   # [/IGE]
 
   if(DEFINED PYTHON_INCLUDE_DIRS)
-    set(PYTHONLIBS_FOUND TRUE)
+    set(Python_FOUND TRUE)
+    set(Python_INCLUDE_DIRS ${PYTHON_INCLUDE_DIRS})
   endif()
   
   list(APPEND CMAKE_MODULE_PATH "${NANOGUI_PYBIND11_DIR}/tools")
-  
-  if (NOT PYTHONLIBS_FOUND)
-    # Try to autodetect Python (can be overridden manually if needed)
-    set(Python_ADDITIONAL_VERSIONS 3.9 3.8 3.7 3.6 3.5 3.4)
-    find_package(PythonLibsNew)
-    if (NOT PYTHONLIBS_FOUND)
-      # Python not found -- disable the plugin
-      set(NANOGUI_BUILD_PYTHON OFF CACHE BOOL "Build a Python plugin for NanoGUI?" FORCE)
-      message(WARNING "NanoGUI: not building the Python plugin (could not find Python!)")
-    else()
-      message(STATUS "NanoGUI: building the Python plugin.")
-    endif()
+
+  if (NOT Python_FOUND)
+    # Python not found -- disable the plugin
+    set(NANOGUI_BUILD_PYTHON OFF CACHE BOOL "Build a Python plugin for NanoGUI?" FORCE)
+    message(WARNING "NanoGUI: not building the Python plugin (could not find Python!)")
+  else()
+    message(STATUS "NanoGUI: building the Python plugin.")
   endif()
+
 else()
   message(STATUS "NanoGUI: not building the Python plugin.")
 endif()
@@ -642,7 +649,26 @@ if (NANOGUI_BUILD_GLAD AND NANOGUI_BUILD_SHARED)
 endif()
 
 if (NANOGUI_BUILD_SHARED)
-  target_link_libraries(nanogui PRIVATE ${NANOGUI_EXTRA_LIBS})
+  target_link_libraries(nanogui PRIVATE ${NANOGUI_EXTRA_LIBS}
+      user32
+      Gdi32
+      GLEW
+      Crypt32
+      opengl32
+      glu32
+      imagehlp
+      dinput8
+      dxguid
+      winmm
+      imm32
+      ole32
+      oleaut32
+      shell32
+      version
+      uuid
+      Setupapi
+      ${CONAN_LIBS}
+  )
 else()
   target_link_libraries(nanogui PUBLIC ${NANOGUI_EXTRA_LIBS})
 endif()
@@ -711,7 +737,7 @@ if (NANOGUI_BUILD_PYTHON)
     # set_target_properties(glfw_objects PROPERTIES POSITION_INDEPENDENT_CODE ON)
   # endif()
 
-  include_directories("${NANOGUI_PYBIND11_DIR}/include" ${PYTHON_INCLUDE_DIRS})
+  include_directories("${NANOGUI_PYBIND11_DIR}/include" ${Python_INCLUDE_DIRS})
 
   set(NANOGUI_PYTHON_LIB_CONTENTS # [IGE]
     python/main.cpp
@@ -732,8 +758,10 @@ if (NANOGUI_BUILD_PYTHON)
     python/nanovg.cpp
     python/render.cpp
     python/vector.cpp
-    python/python.h python/py_doc.h
-    ${LIBNANOGUI_PYTHON_EXTRA_SOURCE})
+    python/python.h
+    python/py_doc.h
+    ${LIBNANOGUI_PYTHON_EXTRA_SOURCE}
+  )
 
 # [IGE]: enable python static lib 
 if(NOT NANOGUI_BUILD_SHARED)
@@ -756,7 +784,12 @@ else()
 
   # The prefix and extension are provided by FindPythonLibsNew.cmake
   set_target_properties(igeNanoGUI PROPERTIES PREFIX "${PYTHON_MODULE_PREFIX}")
-  set_target_properties(igeNanoGUI PROPERTIES SUFFIX "${PYTHON_MODULE_EXTENSION}")
+
+  if(WIN32)
+    set_target_properties(igeNanoGUI PROPERTIES SUFFIX ".pyd")
+  else()
+    set_target_properties(igeNanoGUI PROPERTIES SUFFIX ".so")
+  endif()
 
   if (WIN32)
     # Set output path
@@ -770,7 +803,7 @@ else()
     # set_target_properties(igeNanoGUI PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "RelWithDebInfo/python")
 
     # Link against the Python shared library
-    target_link_libraries(igeNanoGUI ${PYTHON_LIBRARY})
+    target_link_libraries(igeNanoGUI ${Python_LIBRARIES})
 
     if (MSVC)
       # Optimize for size, /bigobj is needed for due to the heavy template metaprogramming in pybind11

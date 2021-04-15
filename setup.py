@@ -1,13 +1,22 @@
+import importlib
+
+try:
+    importlib.import_module('conans')
+except ImportError:
+    from pip._internal import main as _main
+    _main(['install', 'conan'])
+
+import pathlib
 import os
 import re
 import sys
 import platform
 import subprocess
+import shutil
 
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 from distutils.version import LooseVersion
-from distutils.command.install_headers import install_headers
 
 is64Bit = sys.maxsize > 2 ** 32
 if is64Bit:
@@ -15,46 +24,7 @@ if is64Bit:
 else:
     build_arch = 'x86'
 
-headers = [
-    'include/nanogui/colorpicker.h',
-    'include/nanogui/arcball.h',
-    'include/nanogui/renderpass.h',
-    'include/nanogui/theme.h',
-    'include/nanogui/colorwheel.h',
-    'include/nanogui/progressbar.h',
-    'include/nanogui/textbox.h',
-    'include/nanogui/imagepanel.h',
-    'include/nanogui/label.h',
-    'include/nanogui/shader.h',
-    'include/nanogui/popup.h',
-    'include/nanogui/opengl.h',
-    'include/nanogui/widget.h',
-    'include/nanogui/nanogui.h',
-    'include/nanogui/combobox.h',
-    'include/nanogui/popupbutton.h',
-    'include/nanogui/icons.h',
-    'include/nanogui/toolbutton.h',
-    'include/nanogui/window.h',
-    'include/nanogui/imageview.h',
-    'include/nanogui/graph.h',
-    'include/nanogui/checkbox.h',
-    'include/nanogui/layout.h',
-    'include/nanogui/slider.h',
-    'include/nanogui/common.h',
-    'include/nanogui/button.h',
-    'include/nanogui/object.h',
-    'include/nanogui/texture.h',
-    'include/nanogui/metal.h',
-    'include/nanogui/screen.h',
-    'include/nanogui/canvas.h',
-    'include/nanogui/python.h',
-    'include/nanogui/messagedialog.h',
-    'include/nanogui/vscrollpanel.h',
-    'include/nanogui/formhelper.h',
-    'include/nanogui/tabwidget.h',
-    'include/nanogui/textarea.h'
-]
-
+from conanfile import IgeConan
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):
@@ -79,13 +49,14 @@ class CMakeBuild(build_ext):
             self.build_extension(ext)
 
     def build_extension(self, ext):
+        cwd = pathlib.Path().absolute()
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
-        cmake_args = ['-DPYTHON_EXECUTABLE=' + sys.executable,
-                      '-DNANOGUI_BUILD_GLEW=YES',
+        cmake_args = ['-DNANOGUI_BUILD_GLEW=YES',
                       '-DNANOGUI_BUILD_EXAMPLES=NO',
                       '-DAPP_STYLE=SHARED',
                       '-DPLATFORM=pc',
                       '-DBUILD_ARCH=' + build_arch,
+                      '-DPYTHON_VERSION=' + str(sys.version_info[0]) + '.' + str(sys.version_info[1])
                       ]
 
         cfg = 'Debug' if self.debug else 'Release'
@@ -109,31 +80,50 @@ class CMakeBuild(build_ext):
                                                               self.distribution.get_version())
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
+        os.chdir(self.build_temp)
+
+        igeBuilder = os.environ.get('IGE_BUILDER')
+        conanProfile = None
+        cmake_arch = None
+
+        if sys.platform == 'win32':
+            if sys.maxsize > 2 ** 32:
+                conanProfile = os.path.join(igeBuilder, 'profiles', 'windows_x86_64')
+                cmake_arch = 'x64'
+            else:
+                conanProfile = os.path.join(igeBuilder, 'profiles', 'windows_x86')
+                cmake_arch = 'Win32'
+
+        if conanProfile:
+            self.spawn(['conan', 'install', f'--profile={conanProfile}', str(cwd), '--update', '--remote', 'ige-center'])
+        else:
+            self.spawn(['conan', 'install', '--update', '--remote', 'ige-center'])
+
+        os.chdir(cwd)
         subprocess.check_call(['cmake', ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
         subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
 
-class InstallHeaders(install_headers):
-    """Use custom header installer because the default one flattens subdirectories"""
-    def run(self):
-        if not self.distribution.headers:
-            return
+        ext_name = str(ext.name).split('.')[-1]
+        pyd_path = os.path.join(self.build_temp, 'bin', f'{ext_name}.pyd')
+        extension_path = os.path.join(cwd, self.get_ext_fullpath(ext.name))
+        extension_dir = os.path.dirname(extension_path)
+        if not os.path.exists(extension_dir):
+            os.makedirs(extension_dir)
+        shutil.move(pyd_path, extension_path)
 
-        for header in self.distribution.headers:
-            subdir = os.path.dirname(os.path.relpath(header, 'include/nanogui'))
-            install_dir = os.path.join(self.install_dir, subdir)
-            self.mkpath(install_dir)
-            (out, _) = self.copy_file(header, install_dir)
-            self.outfiles.append(out)
+        # Troubleshooting: if fail on line above then delete all possible
+        # temporary CMake files including "CMakeCache.txt" in top level dir.
+        os.chdir(str(cwd))
 
 setup(
-    name='igeNanoGUI',
-    version='0.0.1',
+    name=IgeConan.name,
+    version=IgeConan.version,
     author='Wenzel Jakob',
     author_email='wenzel.jakob@epfl.ch',
     description='A minimalistic GUI library for OpenGL, GLES 2, and Metal',
     long_description='',
     ext_modules=[CMakeExtension('igeNanoGUI')],
-    headers=headers,
-    cmdclass=dict(build_ext=CMakeBuild, install_headers=InstallHeaders),
-    zip_safe=False
+    cmdclass=dict(build_ext=CMakeBuild),
+    zip_safe=False,
+      setup_requires=['wheel']
 )
