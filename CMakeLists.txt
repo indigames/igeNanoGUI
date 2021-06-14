@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.15.0)
 
 project(nanogui)
 
@@ -10,23 +10,14 @@ if (NOT DEFINED PYTHON_VERSION)
     set(PYTHON_VERSION 3.7)
 endif()
 
-if(${APP_STYLE} MATCHES "SHARED")
-  find_package (Python ${PYTHON_VERSION} EXACT REQUIRED COMPONENTS Development)
-else()
-  set (Python_INCLUDE_DIRS "")
-endif()
-
-# [IGE]: try include conan build config
-if(EXISTS ${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-    include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-    conan_basic_setup()
-    list(GET CONAN_INCLUDE_DIRS_PYXCORE 0 PYXCORE_INCLUDE_DIRS)
-    list(GET CONAN_INCLUDE_DIRS_PYBIND11 0 PYBIND11_INCLUDE_DIRS)
-endif()
-# [/IGE]
-
 # [IGE]: platform config
-set (CMAKE_CXX_STANDARD 17) # NanoGUI need C++17
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+
+# Modules and install path (required by conan)
+set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/install)
+set(CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR} ${CMAKE_MODULE_PATH})
+set(CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR} ${CMAKE_PREFIX_PATH})
 
 if(DEFINED ANDROID_PLATFORM)
     set (ANDROID 1)
@@ -45,12 +36,34 @@ if(DEFINED ANDROID_PLATFORM)
         add_compile_options(-Og)
     endif()
 elseif(MSVC)
-    add_compile_options(/MP)
+    if(${APP_STYLE} MATCHES "SHARED")
+        set(CMAKE_CXX_FLAGS "/MD ${CMAKE_CXX_FLAGS}")
+        set(CMAKE_CXX_FLAGS_RELEASE "/MD /O2 /Ob2 /Zc:inline")
+        set(CMAKE_CXX_FLAGS_DEBUG "/MD /JMC  /ZI /Od")
+    endif()
+    add_compile_options(/MP /std:c++17)
 elseif(IOS)
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
         add_compile_options(-g0 -Ofast)
     endif()
 endif()
+
+if(${APP_STYLE} MATCHES "SHARED")
+  find_package (Python3 ${PYTHON_VERSION} EXACT REQUIRED COMPONENTS Development)
+else()
+  find_package(Python REQUIRED)
+  set (Python3_INCLUDE_DIRS ${Python_INCLUDE_DIRS})
+  set (Python3_LIBRARIES ${Python_LIBRARIES})
+endif()
+set(PYTHON_INCLUDE_DIRS Python3_INCLUDE_DIRS)
+
+find_package(pyxCore REQUIRED)
+find_package(numpy REQUIRED)
+find_package(igeVmath REQUIRED)
+find_package(stb REQUIRED)
+find_package(SDL REQUIRED)
+find_package(json REQUIRED)
+find_package(pybind11 REQUIRED)
 #endif
 
 if (POLICY CMP0058)
@@ -104,7 +117,7 @@ set(NANOGUI_BUILD_PYTHON_DEFAULT ON)
 
 # [IGE]: add more flags
 set(NANOGUI_BUILD_EXAMPLES_DEFAULT OFF) # [IGE]: added
-set(NANOGUI_INSTALL_DEFAULT OFF)  # [IGE]: added
+set(NANOGUI_INSTALL_DEFAULT ON)
 # [/IGE]
 
 if (CMAKE_CXX_COMPILER MATCHES "/em\\+\\+(-[a-zA-Z0-9.])?$")
@@ -159,17 +172,11 @@ endif()
 set_property(CACHE NANOGUI_BACKEND PROPERTY STRINGS "OpenGL" "GLES 2" "GLES 3" "Metal")
 
 # Allow overriding the pybind11 library used to compile NanoGUI
-set(NANOGUI_PYBIND11_DIR "${PYBIND11_INCLUDE_DIRS}"
+set(NANOGUI_PYBIND11_DIR "${pybind11_INCLUDE_DIRS}"
   CACHE STRING "Path containing the 'pybind11' library used to compile nanogui.")
 mark_as_advanced(NANOGUI_PYBIND11_DIR)
 
 if (NANOGUI_BUILD_PYTHON)
-  # [IGE]: enable python static lib 
-  if(NOT NANOGUI_BUILD_SHARED)
-    set (PYTHON_INCLUDE_DIRS "${CONAN_INCLUDE_DIRS}")
-  endif()
-  # [/IGE]
-
   if(DEFINED PYTHON_INCLUDE_DIRS)
     set(Python_FOUND TRUE)
     set(Python_INCLUDE_DIRS ${PYTHON_INCLUDE_DIRS})
@@ -414,7 +421,26 @@ if (NANOGUI_BUILD_SDL2)
   add_definitions(-DNANOGUI_BUILD_SDL2) # [IGE]: Add preprocess flag for code controlling
 endif()
 
-list(APPEND NANOGUI_EXTRA_LIBS ${CONAN_LIBS})
+list(APPEND NANOGUI_EXTRA_INCS
+  ${Python3_INCLUDE_DIRS}
+  ${pyxCore_INCLUDE_DIRS}
+  ${pyxCore_INCLUDE_DIRS}/ThirdParty/GLEW
+  ${numpy_INCLUDE_DIRS}
+  ${igeVmath_INCLUDE_DIRS}
+  ${stb_INCLUDE_DIRS}
+  ${SDL_INCLUDE_DIRS}
+  ${json_INCLUDE_DIRS}
+  ${pybind11_INCLUDE_DIRS}
+)
+
+list(APPEND NANOGUI_EXTRA_LIBS
+  ${Python3_LIBRARIES}
+  ${pyxCore_LIBRARIES}
+  ${numpy_LIBRARIES}
+  ${igeVmath_LIBRARIES}
+  ${stb_LIBRARIES}
+  ${SDL_LIBRARIES}
+)
 # [/IGE]
 
 if (NANOGUI_BUILD_GLAD)
@@ -549,7 +575,7 @@ add_custom_command(
   PRE_BUILD VERBATIM)
 
 # Needed to generated files
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_BINARY_DIR} ${NANOGUI_EXTRA_INCS})
 
 # Set library type
 if (NANOGUI_BUILD_SHARED)
@@ -652,7 +678,6 @@ if (NANOGUI_BUILD_SHARED)
   target_link_libraries(nanogui PRIVATE ${NANOGUI_EXTRA_LIBS}
       user32
       Gdi32
-      GLEW
       Crypt32
       opengl32
       glu32
@@ -667,7 +692,6 @@ if (NANOGUI_BUILD_SHARED)
       version
       uuid
       Setupapi
-      ${CONAN_LIBS}
   )
 else()
   target_link_libraries(nanogui PUBLIC ${NANOGUI_EXTRA_LIBS})
@@ -678,8 +702,12 @@ if (NANOGUI_INSTALL)
           LIBRARY DESTINATION lib
           ARCHIVE DESTINATION lib)
 
-  install(DIRECTORY include/nanogui DESTINATION include
-          FILES_MATCHING PATTERN "*.h")
+  file(GLOB_RECURSE PUBLIC_INCLUDE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/nanogui/*.h*")
+  foreach(HEADER ${PUBLIC_INCLUDE_FILES})
+    file(RELATIVE_PATH HEADER_RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/include/nanogui/" "${HEADER}")
+    get_filename_component(DIR ${HEADER_RELATIVE} DIRECTORY)
+    install(FILES ${HEADER} DESTINATION include/${DIR})
+  endforeach()
 endif()
 
 if (NANOGUI_BUILD_SHARED)
@@ -737,7 +765,7 @@ if (NANOGUI_BUILD_PYTHON)
     # set_target_properties(glfw_objects PROPERTIES POSITION_INDEPENDENT_CODE ON)
   # endif()
 
-  include_directories("${NANOGUI_PYBIND11_DIR}/include" ${Python_INCLUDE_DIRS})
+  include_directories("${NANOGUI_PYBIND11_DIR}/include" ${PYTHON_INCLUDE_DIRS} ${NANOGUI_EXTRA_INCS})
 
   set(NANOGUI_PYTHON_LIB_CONTENTS # [IGE]
     python/main.cpp
@@ -768,10 +796,15 @@ if(NOT NANOGUI_BUILD_SHARED)
   add_library(igeNanoGUI-static STATIC ${NANOGUI_PYTHON_LIB_CONTENTS}) # [IGE]
   # set_property(TARGET igeNanoGUI-static PROPERTY POSITION_INDEPENDENT_CODE ON) # [IGE]
   target_link_libraries(igeNanoGUI-static nanogui) # [IGE]
+  if (NANOGUI_INSTALL)
+    install(TARGETS igeNanoGUI-static
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib)
+  endif()
 else()
   add_library(igeNanoGUI SHARED ${NANOGUI_PYTHON_LIB_CONTENTS}) # [IGE]
   # set_property(TARGET igeNanoGUI PROPERTY POSITION_INDEPENDENT_CODE ON) # [IGE]
-  target_link_libraries(igeNanoGUI nanogui) # [IGE]
+  target_link_libraries(igeNanoGUI nanogui ${Python3_LIBRARIES}) # [IGE]
 
   # Quench warnings on GCC
   if (CMAKE_COMPILER_IS_GNUCC)

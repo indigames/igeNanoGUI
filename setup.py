@@ -6,92 +6,65 @@ except ImportError:
     from pip._internal import main as _main
     _main(['install', 'conan'])
 
+from setuptools import setup, Extension, find_packages
+from setuptools.command.build_ext import build_ext as build_ext_orig
 import pathlib
-import os
-import re
+import setuptools
+import numpy
 import sys
-import platform
-import subprocess
+import os
 import shutil
 
-from setuptools import setup, Extension
-from setuptools.command.build_ext import build_ext
-from distutils.version import LooseVersion
-
-is64Bit = sys.maxsize > 2 ** 32
-if is64Bit:
-    build_arch = 'x64'
-else:
-    build_arch = 'x86'
+from os import path
+here = path.abspath(path.dirname(__file__))
 
 from conanfile import IgeConan
 
 class CMakeExtension(Extension):
-    def __init__(self, name, sourcedir=''):
-        Extension.__init__(self, name, sources=[])
-        self.sourcedir = os.path.abspath(sourcedir)
+    def __init__(self, name):
+        super().__init__(name, sources=[])
 
-
-class CMakeBuild(build_ext):
+class build_ext(build_ext_orig):
     def run(self):
-        try:
-            out = subprocess.check_output(['cmake', '--version'])
-        except OSError:
-            raise RuntimeError("CMake must be installed to build the following extensions: " +
-                               ", ".join(e.name for e in self.extensions))
-
-        if platform.system() == "Windows":
-            cmake_version = LooseVersion(re.search(r'version\s*([\d.]+)', out.decode()).group(1))
-            if cmake_version < '3.1.0':
-                raise RuntimeError("CMake >= 3.1.0 is required on Windows")
-
         for ext in self.extensions:
-            self.build_extension(ext)
+            self.build_cmake(ext)
+        super().run()
 
-    def build_extension(self, ext):
+    def build_cmake(self, ext):
         cwd = pathlib.Path().absolute()
+
+        # these dirs will be created in build_py, so if you don't have
+        # any python sources to bundle, the dirs will be missing
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
-        cmake_args = ['-DNANOGUI_BUILD_GLEW=YES',
-                      '-DNANOGUI_BUILD_EXAMPLES=NO',
-                      '-DAPP_STYLE=SHARED',
-                      '-DPLATFORM=pc',
-                      '-DBUILD_ARCH=' + build_arch,
-                      '-DPYTHON_VERSION=' + str(sys.version_info[0]) + '.' + str(sys.version_info[1])
-                      ]
+        build_temp =  os.path.abspath(os.path.dirname(self.build_temp))
 
-        cfg = 'Debug' if self.debug else 'Release'
-        build_args = ['--config', cfg]
-        cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
-        cmake_args += ['-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), self.build_temp)]
-        cmake_args += ['-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
+        # example of cmake args
+        config = 'Debug' if self.debug else 'Release'
+        cmake_args = [
+            '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + str(extdir),
+            '-DCMAKE_BUILD_TYPE=' + config,
+            '-DAPP_STYLE=SHARED',
+            '-DPYTHON_VERSION=' + str(sys.version_info[0]) + '.' + str(sys.version_info[1])
+        ]
 
-        if platform.system() == "Windows":
-            if sys.maxsize > 2**32:
-                cmake_args += ['-A', 'x64']
-            else:
-                cmake_args += ['-A', 'Win32']
-            build_args += ['--', '/m']
-        else:
-            cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
-            build_args += ['--', '-j2']
+        # example of build args
+        build_args = [
+            '--config', config
+        ]
 
-        env = os.environ.copy()
-        env['CXXFLAGS'] = '{} -DVERSION_INFO=\\"{}\\"'.format(env.get('CXXFLAGS', ''),
-                                                              self.distribution.get_version())
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
-        os.chdir(self.build_temp)
+        os.chdir(str(build_temp))
 
-        igeBuilder = os.environ.get('IGE_BUILDER')
         conanProfile = None
         cmake_arch = None
 
         if sys.platform == 'win32':
             if sys.maxsize > 2 ** 32:
-                conanProfile = os.path.join(igeBuilder, 'profiles', 'windows_x86_64')
+                conanProfile = os.path.join(str(cwd), 'cmake', 'profiles', 'windows_x86_64')
                 cmake_arch = 'x64'
             else:
-                conanProfile = os.path.join(igeBuilder, 'profiles', 'windows_x86')
+                conanProfile = os.path.join(str(cwd), 'cmake', 'profiles', 'windows_x86')
                 cmake_arch = 'Win32'
 
         if conanProfile:
@@ -99,12 +72,15 @@ class CMakeBuild(build_ext):
         else:
             self.spawn(['conan', 'install', '--update', '--remote', 'ige-center'])
 
-        os.chdir(cwd)
-        subprocess.check_call(['cmake', ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
-        subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
+        if cmake_arch:
+            self.spawn(['cmake', '-A', cmake_arch, str(cwd)] + cmake_args)
+        else:
+            self.spawn(['cmake', str(cwd)] + cmake_args)
 
         ext_name = str(ext.name).split('.')[-1]
-        pyd_path = os.path.join(self.build_temp, 'bin', f'{ext_name}.pyd')
+        if not self.dry_run:
+            self.spawn(['cmake', '--build', '.', '--target', ext_name] + build_args)
+        pyd_path = os.path.join(build_temp, config, f'{ext_name}.pyd')
         extension_path = os.path.join(cwd, self.get_ext_fullpath(ext.name))
         extension_dir = os.path.dirname(extension_path)
         if not os.path.exists(extension_dir):
@@ -115,15 +91,29 @@ class CMakeBuild(build_ext):
         # temporary CMake files including "CMakeCache.txt" in top level dir.
         os.chdir(str(cwd))
 
-setup(
-    name=IgeConan.name,
-    version=IgeConan.version,
-    author='Wenzel Jakob',
-    author_email='wenzel.jakob@epfl.ch',
-    description='A minimalistic GUI library for OpenGL, GLES 2, and Metal',
-    long_description='',
-    ext_modules=[CMakeExtension('igeNanoGUI')],
-    cmdclass=dict(build_ext=CMakeBuild),
-    zip_safe=False,
+
+setup(name=IgeConan.name, version=IgeConan.version,
+      description='C++ NanoGUI extension for 3D and 2D games.',
+      author=u'Indigames',
+      author_email='dev@indigames.net',
+      packages=find_packages(),
+      ext_modules=[CMakeExtension('igeNanoGUI')],
+      cmdclass={
+          'build_ext': build_ext,
+      },
+      long_description=open(path.join(here, 'README.rst')).read(),
+      long_description_content_type='text/markdown',
+      url='https://indigames.net/',
+      license='MIT',
+      classifiers=[
+          'Intended Audience :: Developers',
+          'License :: OSI Approved :: MIT License',
+          'Programming Language :: Python :: 3',
+          #'Operating System :: MacOS :: MacOS X',
+          #'Operating System :: POSIX :: Linux',
+          'Operating System :: Microsoft :: Windows',
+          'Topic :: Games/Entertainment',
+      ],
+      keywords='NanoGUI GUI 3D game Indigames',
       setup_requires=['wheel']
-)
+      )
