@@ -43,17 +43,17 @@ def main():
     setEnv('CONAN_REVISIONS_ENABLED', '1')
     if platform.system() == 'Windows':
         build('windows', 'x86')
-        # build('windows', 'x86_64')
-        # build('android', 'x86')
-        # build('android', 'x86_64')
-        # build('android', 'armv7')
-        # build('android', 'armv8')
-    # elif platform.system() == 'Darwin':
-        # build('macos', 'x86_64')
-        # build('ios', 'armv8')
-    # ret_code = os.system(f'conan upload {IgeConan.name}/{IgeConan.version}@ige/test --remote ige-center  --all --check --confirm --retry 3 --retry-wait 60 --force')
-    # if ret_code != 0:
-        # exit(1)
+        build('windows', 'x86_64')
+        build('android', 'x86')
+        build('android', 'x86_64')
+        build('android', 'armv7')
+        build('android', 'armv8')
+    elif platform.system() == 'Darwin':
+        build('macos', 'x86_64')
+        build('ios', 'armv8')
+    ret_code = os.system(f'conan upload {IgeConan.name}/{IgeConan.version}@ige/test --remote ige-center  --all --check --confirm --retry 3 --retry-wait 60 --force')
+    if ret_code != 0:
+        exit(1)
 
 if __name__ == "__main__":
     main()
