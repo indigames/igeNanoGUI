@@ -143,7 +143,6 @@ option(NANOGUI_BUILD_GLAD                "Build GLAD OpenGL loader library? (nee
 option(NANOGUI_BUILD_GLEW                "Build GLEW OpenGL loader library? (needed on Windows)" ${NANOGUI_BUILD_GLEW_DEFAULT}) # [IGE]: modified
 option(NANOGUI_BUILD_GLFW                "Build GLFW?" ${NANOGUI_BUILD_GLFW_DEFAULT})
 option(NANOGUI_BUILD_SDL2                "Build SDL2?" ${NANOGUI_BUILD_SDL2_DEFAULT}) # [IGE]: modified
-option(NANOGUI_INSTALL                   "Install NanoGUI on `make install`?" ${NANOGUI_INSTALL_DEFAULT}) # [IGE]: modified
 
 # [IGE]: show warning if non of SDL nor GLFW enabled
 if(NOT ${NANOGUI_BUILD_GLFW_DEFAULT})
@@ -697,18 +696,19 @@ else()
   target_link_libraries(nanogui PUBLIC ${NANOGUI_EXTRA_LIBS})
 endif()
 
-if (NANOGUI_INSTALL)
-  install(TARGETS nanogui
-          LIBRARY DESTINATION lib
-          ARCHIVE DESTINATION lib)
+# Install targets
+install(TARGETS nanogui
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+)
 
-  file(GLOB_RECURSE PUBLIC_INCLUDE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/nanogui/*.h*")
-  foreach(HEADER ${PUBLIC_INCLUDE_FILES})
-    file(RELATIVE_PATH HEADER_RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/include/nanogui/" "${HEADER}")
+file(GLOB_RECURSE PUBLIC_INCLUDE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h*")
+foreach(HEADER ${PUBLIC_INCLUDE_FILES})
+    file(RELATIVE_PATH HEADER_RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/include/" "${HEADER}")
     get_filename_component(DIR ${HEADER_RELATIVE} DIRECTORY)
     install(FILES ${HEADER} DESTINATION include/${DIR})
-  endforeach()
-endif()
+endforeach()
+
 
 if (NANOGUI_BUILD_SHARED)
   # When GLFW is merged into the NanoGUI library, this flag must be specified
@@ -796,11 +796,10 @@ if(NOT NANOGUI_BUILD_SHARED)
   add_library(igeNanoGUI-static STATIC ${NANOGUI_PYTHON_LIB_CONTENTS}) # [IGE]
   # set_property(TARGET igeNanoGUI-static PROPERTY POSITION_INDEPENDENT_CODE ON) # [IGE]
   target_link_libraries(igeNanoGUI-static nanogui) # [IGE]
-  if (NANOGUI_INSTALL)
     install(TARGETS igeNanoGUI-static
         LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib)
-  endif()
+        ARCHIVE DESTINATION lib
+    )
 else()
   add_library(igeNanoGUI SHARED ${NANOGUI_PYTHON_LIB_CONTENTS}) # [IGE]
   # set_property(TARGET igeNanoGUI PROPERTY POSITION_INDEPENDENT_CODE ON) # [IGE]
@@ -865,11 +864,10 @@ else()
     endif()
   endif()
 
-  if (NANOGUI_INSTALL)
     install(TARGETS igeNanoGUI
-            LIBRARY DESTINATION lib
-            ARCHIVE DESTINATION lib)
-  endif()
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+    )
 endif()
 # [/IGE]
 endif()
